@@ -3,4 +3,10 @@ name = "rpc-genie"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = [
+    "crates/rpc-genie-macros",
+]
+
 [dependencies]
+rpc-genie-macros = { path = "crates/rpc-genie-macros" }
