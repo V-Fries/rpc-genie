@@ -146,6 +146,28 @@ macro_rules! expect_error {
 }
 
 #[test]
+fn error_if_duplicate_server() {
+    let service = quote! {
+        mod foo {
+            struct Server;
+            struct Server;
+        }
+    };
+    expect_error!(service, "Server struct was already defined");
+}
+
+#[test]
+fn error_if_duplicate_client() {
+    let service = quote! {
+        mod foo {
+            struct Client;
+            struct Client;
+        }
+    };
+    expect_error!(service, "Client struct was already defined");
+}
+
+#[test]
 fn error_if_sub_services_name_is_also_a_server_field_name() {
     let service = quote! {
         mod foo {
