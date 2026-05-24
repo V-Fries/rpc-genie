@@ -27,7 +27,6 @@ use syn::{
 #[allow(dead_code)]
 pub struct Service {
     pub module: ItemMod,
-
     pub server: ItemStruct,
     pub server_remote_methods: Vec<RemoteMethod>,
     pub client: ItemStruct,
