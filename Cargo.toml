@@ -10,4 +10,3 @@ members = [
 
 [dependencies]
 rpc-genie-macros = { path = "crates/rpc-genie-macros" }
-
