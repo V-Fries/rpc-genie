@@ -30,6 +30,16 @@ pub fn parse_impl_item(
     };
 
     match is_impl_block_for_server_or_client(&impl_item) {
+        ImplForServerOrClient::Server => push_remote_methods_block_methods(
+            &mut service.server_remote_methods,
+            &impl_item,
+            errors,
+        ),
+        ImplForServerOrClient::Client => push_remote_methods_block_methods(
+            &mut service.client_remote_methods,
+            &impl_item,
+            errors,
+        ),
         ImplForServerOrClient::Neither => {
             if has_remote_methods_attr {
                 combine_errors(
@@ -43,16 +53,6 @@ pub fn parse_impl_item(
                 service.rest.push(Item::Impl(impl_item));
             }
         }
-        ImplForServerOrClient::Server => push_remote_methods_block_methods(
-            &mut service.server_remote_methods,
-            &impl_item,
-            errors,
-        ),
-        ImplForServerOrClient::Client => push_remote_methods_block_methods(
-            &mut service.client_remote_methods,
-            &impl_item,
-            errors,
-        ),
     }
 }
 
