@@ -23,7 +23,7 @@ pub fn parse_struct_item(
                 errors,
                 syn::Error::new_spanned(struct_item, "Client struct was already defined"),
             );
-        } 
+        }
         service.client = Some(struct_item);
     } else {
         service.rest.push(Item::Struct(struct_item));
