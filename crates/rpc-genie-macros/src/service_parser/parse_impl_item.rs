@@ -1,17 +1,10 @@
 use std::ops::Deref;
 
-use syn::{Attribute, FnArg, Ident, ImplItem, ImplItemFn, Item, ItemImpl, PatType, Receiver, Type};
+use syn::{Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Type};
+
+use crate::RemoteMethod;
 
 use super::{ServiceBuilder, combine_errors, create_result};
-
-// TODO remove allow(dead_code)
-#[allow(dead_code)]
-pub struct RemoteMethod {
-    pub ident: Ident,
-    pub receiver: Option<Receiver>,
-    pub args: Vec<PatType>,
-    pub method: ImplItemFn,
-}
 
 enum ImplForServerOrClient {
     Server,

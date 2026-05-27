@@ -1,3 +1,5 @@
+use crate::{RemoteMethod, SubService};
+
 use super::*;
 use proc_macro2::TokenStream;
 use quote::quote;
