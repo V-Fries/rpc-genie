@@ -4,7 +4,7 @@ use syn::{
     punctuated::Punctuated,
 };
 
-use crate::SubService;
+use crate::service::SubService;
 
 use super::{ServiceBuilder, combine_errors};
 

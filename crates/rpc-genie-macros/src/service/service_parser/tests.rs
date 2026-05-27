@@ -1,4 +1,4 @@
-use crate::{RemoteMethod, SubService};
+use crate::service::{RemoteMethod, SubService};
 
 use super::*;
 use proc_macro2::TokenStream;

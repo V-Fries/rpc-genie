@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use syn::{Ident, Item, ItemMod, ItemStruct};
 
-use crate::{RemoteMethod, SubService};
+use crate::service::{RemoteMethod, SubService};
 
 use super::{Service, combine_errors};
 

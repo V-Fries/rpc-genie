@@ -1,6 +1,6 @@
 use syn::{Item, ItemStruct};
 
-use crate::service_parser::error_helpers::combine_errors;
+use crate::service::service_parser::error_helpers::combine_errors;
 
 use super::ServiceBuilder;
 

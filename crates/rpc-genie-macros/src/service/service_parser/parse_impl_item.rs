@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use syn::{Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Type};
 
-use crate::RemoteMethod;
+use crate::service::RemoteMethod;
 
 use super::{ServiceBuilder, combine_errors, create_result};
 
