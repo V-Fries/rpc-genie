@@ -1,5 +1,7 @@
 mod service_parser;
 
+use proc_macro2::TokenStream;
+use quote::{ToTokens, TokenStreamExt, quote};
 use syn::{Ident, ImplItemFn, Item, ItemMod, ItemStruct, PatType, Path, Receiver, Token};
 
 // TODO remove allow(dead_code)
@@ -31,4 +33,38 @@ struct SubService {
     colon: Token![:],
     path: Path,
 }
+
+impl ToTokens for Service {
+    fn to_tokens(&self, dst: &mut TokenStream) {
+        let ItemMod {
+            attrs,
+            vis,
+            unsafety,
+            mod_token,
+            ident,
+            content: _,
+            semi,
+        } = &self.module;
+
+        let content = self.content();
+
+        let tokens = quote! {
+            #(#attrs)*
+            #vis #unsafety #mod_token #ident {
+                #content
+            }#semi
+        };
+
+        dst.append_all(tokens);
+    }
+}
+
+impl Service {
+    fn content(&self) -> TokenStream {
+        let rest = &self.rest;
+
+        quote! {
+            #(#rest)*
+        }
+    }
 }
