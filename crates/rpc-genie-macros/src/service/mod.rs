@@ -61,10 +61,59 @@ impl ToTokens for Service {
 
 impl Service {
     fn content(&self) -> TokenStream {
+        let server_and_clients_structs = self.server_and_clients_structs();
+
         let rest = &self.rest;
 
         quote! {
+            #server_and_clients_structs
+
             #(#rest)*
+        }
+    }
+
+    /// Creates the final code for the Server and Client
+    fn server_and_clients_structs(&self) -> TokenStream {
+        let create_final_struct = |ItemStruct {
+                                       attrs,
+                                       vis,
+                                       struct_token,
+                                       ident,
+                                       generics,
+                                       fields,
+                                       semi_token,
+                                   }: &ItemStruct| {
+            let sub_services_fields = self.sub_services.iter().fold(
+                TokenStream::new(),
+                |acc,
+                 SubService {
+                     pub_keyword,
+                     name,
+                     colon,
+                     path,
+                 }| {
+                    quote! {
+                        #acc
+                        #pub_keyword #name #colon #path :: #ident,
+                    }
+                },
+            );
+
+            quote! {
+                #(#attrs)*
+                #vis #struct_token #ident #generics {
+                    #fields
+                    #sub_services_fields
+                }#semi_token
+            }
+        };
+
+        let server_state = create_final_struct(&self.server);
+        let client_state = create_final_struct(&self.client);
+
+        quote! {
+            #server_state
+            #client_state
         }
     }
 }
