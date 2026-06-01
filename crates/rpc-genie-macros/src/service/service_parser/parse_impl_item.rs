@@ -14,7 +14,7 @@ enum ImplForServerOrClient {
 
 pub fn parse_impl_item(
     service: &mut ServiceBuilder,
-    impl_item: ItemImpl,
+    mut impl_item: ItemImpl,
     errors: &mut Option<syn::Error>,
 ) {
     let has_remote_methods_attr = has_remote_methods_attr(&impl_item, errors);
@@ -43,15 +43,18 @@ pub fn parse_impl_item(
                 combine_errors(
                     errors,
                     syn::Error::new_spanned(
-                        impl_item,
+                        impl_item.clone(),
                         "Only the Server and Client structs may use the #[remote_methods] attribute",
                     ),
                 );
-            } else {
-                service.rest.push(Item::Impl(impl_item));
             }
         }
     }
+
+    impl_item
+        .attrs
+        .retain(|attr| !attr.path().is_ident("remote_methods"));
+    service.rest.push(Item::Impl(impl_item));
 }
 
 fn has_remote_methods_attr(impl_item: &ItemImpl, errors: &mut Option<syn::Error>) -> bool {
@@ -147,7 +150,6 @@ fn push_remote_methods_block_method(function: &ImplItemFn) -> syn::Result<Remote
         ident: function.sig.ident.clone(),
         receiver: None,
         args: Vec::new(),
-        method: function.clone(),
     };
 
     let mut inputs = function.sig.inputs.iter();

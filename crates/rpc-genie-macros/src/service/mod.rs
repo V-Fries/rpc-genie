@@ -2,7 +2,7 @@ mod service_parser;
 
 use proc_macro2::TokenStream;
 use quote::{ToTokens, TokenStreamExt, quote};
-use syn::{Ident, ImplItemFn, Item, ItemMod, ItemStruct, PatType, Path, Receiver, Token};
+use syn::{Ident, Item, ItemMod, ItemStruct, PatType, Path, Receiver, Token};
 
 // TODO remove allow(dead_code)
 #[allow(dead_code)]
@@ -22,7 +22,6 @@ struct RemoteMethod {
     ident: Ident,
     receiver: Option<Receiver>,
     args: Vec<PatType>,
-    method: ImplItemFn,
 }
 
 // TODO remove allow(dead_code)
