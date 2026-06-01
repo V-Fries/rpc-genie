@@ -4,7 +4,7 @@ use syn::{Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Type};
 
 use crate::service::RemoteMethod;
 
-use super::{ServiceBuilder, combine_errors, create_result};
+use super::{ServiceBuilder, combine_errors};
 
 enum ImplForServerOrClient {
     Server,
@@ -17,22 +17,27 @@ pub fn parse_impl_item(
     impl_item: ItemImpl,
     errors: &mut Option<syn::Error>,
 ) {
-    let has_remote_methods_attr = match has_remote_methods_attr(&impl_item) {
-        Ok(has_remote_methods_attr) => has_remote_methods_attr,
-        Err(err) => return combine_errors(errors, err),
-    };
+    let has_remote_methods_attr = has_remote_methods_attr(&impl_item, errors);
 
     match is_impl_block_for_server_or_client(&impl_item) {
-        ImplForServerOrClient::Server => push_remote_methods_block_methods(
-            &mut service.server_remote_methods,
-            &impl_item,
-            errors,
-        ),
-        ImplForServerOrClient::Client => push_remote_methods_block_methods(
-            &mut service.client_remote_methods,
-            &impl_item,
-            errors,
-        ),
+        ImplForServerOrClient::Server => {
+            if has_remote_methods_attr {
+                push_remote_methods_block_methods(
+                    &mut service.server_remote_methods,
+                    &impl_item,
+                    errors,
+                )
+            }
+        }
+        ImplForServerOrClient::Client => {
+            if has_remote_methods_attr {
+                push_remote_methods_block_methods(
+                    &mut service.client_remote_methods,
+                    &impl_item,
+                    errors,
+                )
+            }
+        }
         ImplForServerOrClient::Neither => {
             if has_remote_methods_attr {
                 combine_errors(
@@ -49,21 +54,19 @@ pub fn parse_impl_item(
     }
 }
 
-fn has_remote_methods_attr(impl_item: &ItemImpl) -> syn::Result<bool> {
+fn has_remote_methods_attr(impl_item: &ItemImpl, errors: &mut Option<syn::Error>) -> bool {
     let maybe_remote_method_attr = impl_item
         .attrs
         .iter()
         .filter(|attr| attr.path().is_ident("remote_methods"))
         .collect::<Vec<_>>();
 
-    let mut errors = None;
-
     match maybe_remote_method_attr.as_slice() {
-        [] => return Ok(false),
-        [remote_method_attr] => check_remote_methods_attr_args(remote_method_attr, &mut errors),
+        [] => return false,
+        [remote_method_attr] => check_remote_methods_attr_args(remote_method_attr, errors),
         _ => {
             combine_errors(
-                &mut errors,
+                errors,
                 syn::Error::new_spanned(
                     impl_item,
                     "#[remote_methods] attribute should only be present once",
@@ -74,7 +77,7 @@ fn has_remote_methods_attr(impl_item: &ItemImpl) -> syn::Result<bool> {
 
     if impl_item.attrs.len() != 1 {
         combine_errors(
-            &mut errors,
+            errors,
             syn::Error::new_spanned(
                 impl_item,
                 "When #[remote_methods] attribute is used, other attributes are not allowed",
@@ -82,7 +85,7 @@ fn has_remote_methods_attr(impl_item: &ItemImpl) -> syn::Result<bool> {
         );
     }
 
-    create_result(true, errors)
+    true
 }
 
 /// Returns whether the impl block concerns the Server or the Client struct, or something else
