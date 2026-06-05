@@ -150,10 +150,12 @@ impl Service {
         let client_side_fields = fields_ast_creator(quote!(ClientRequestHandler<'state>));
 
         quote! {
+            #[doc(hidden)]
             pub struct ServerSubServices<'state> {
                 #server_side_fields
             }
 
+            #[doc(hidden)]
             pub struct ClientSubServices<'state> {
                 #client_side_fields
             }
