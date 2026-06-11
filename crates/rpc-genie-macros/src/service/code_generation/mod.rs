@@ -1,3 +1,6 @@
+mod request_handlers;
+mod utils;
+
 use super::{Service, SubService};
 
 use proc_macro2::TokenStream;
@@ -32,16 +35,16 @@ impl ToTokens for Service {
 impl Service {
     fn content(&self) -> TokenStream {
         let server_and_clients_structs = self.server_and_clients_structs();
-
         let sub_services_structs = self.sub_services_structs();
-
+        let request_handlers = self.request_handlers();
+        let handles = self.handles();
         let rest = &self.rest;
 
         quote! {
             #server_and_clients_structs
-
             #sub_services_structs
-
+            #request_handlers
+            #handles
             #(#rest)*
         }
     }
@@ -57,27 +60,30 @@ impl Service {
                                        fields,
                                        semi_token,
                                    }: &ItemStruct| {
-            let sub_services_fields = self.sub_services.iter().fold(
-                TokenStream::new(),
-                |acc,
-                 SubService {
+            let fields_iter = fields.iter();
+
+            let sub_services_fields = self.sub_services.iter().map(
+                |SubService {
                      pub_keyword,
                      name,
                      colon,
                      path,
-                 }| {
-                    quote! {
-                        #acc
-                        #pub_keyword #name #colon #path :: #ident,
-                    }
-                },
+                 }| quote!(#pub_keyword #name #colon #path::#ident),
             );
 
             quote! {
                 #(#attrs)*
                 #vis #struct_token #ident #generics {
-                    #fields
-                    #sub_services_fields
+                    #(#fields_iter,)*
+                    #(
+                        // We always add #[allow(unused)] to sub services state fields as the user
+                        // may never want to access the state directly from the parent
+                        // (The sub-service request handler has a ref to it's state, so the compiler
+                        // won't be able to see that the value is used unless it is used directly in
+                        // the parent)
+                        #[allow(unused)]
+                        #sub_services_fields,
+                    )*
                 }#semi_token
             }
         };
@@ -111,7 +117,7 @@ impl Service {
                  }| {
                     quote! {
                         #acc
-                        #pub_keyword #name #colon #path :: #field_type,
+                        #pub_keyword #name #colon #path::#field_type,
                     }
                 },
             )
@@ -129,6 +135,41 @@ impl Service {
             #[doc(hidden)]
             pub struct ClientSubServices<'state> {
                 #client_side_fields
+            }
+        }
+    }
+
+    fn handles(&self) -> TokenStream {
+        let fields_creator = |handle_struct_name| {
+            self.sub_services.iter().fold(
+                TokenStream::new(),
+                |acc,
+                 SubService {
+                     pub_keyword,
+                     name,
+                     colon,
+                     path,
+                 }| {
+                    quote! {
+                        #acc
+                        #pub_keyword #name #colon #path::#handle_struct_name,
+                    }
+                },
+            )
+        };
+
+        let client_handle_fields = fields_creator(quote!(ClientHandle));
+        let server_handle_fields = fields_creator(quote!(ServerHandle));
+
+        quote! {
+            #[doc(hidden)]
+            pub struct ClientHandle {
+                #client_handle_fields
+            }
+
+            #[doc(hidden)]
+            pub struct ServerHandle {
+                #server_handle_fields
             }
         }
     }

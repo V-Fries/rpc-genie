@@ -1,0 +1,61 @@
+#[rpc_genie::service]
+pub mod rpc {
+    // Define other services to include in the current service
+    sub_services! {
+        // Can have any number of sub services
+        // If we use the same service module multiple times, the state is not shared (i.e. it is
+        // duplicated)
+        pub sub_service_1: super::other_service,
+        pub sub_service_2: super::other_service,
+    }
+
+    pub struct Server {
+        pub server_name: String,
+    }
+
+    #[remote_methods]
+    impl Server {
+        // pass &self for stateful functions (use mutexes and other solutions for mutability)
+        fn server_name(&self) -> String {
+            self.server_name.clone()
+        }
+
+        // Don't pass &self if you don't need the state
+        fn add(a: u32, b: u32) -> u32 {
+            a + b
+        }
+
+        fn add_4(a: u32) -> u32 {
+            // Self::add() is designated as a remote method, but it can still be called locally:
+            Self::add(a, 4)
+        }
+
+        fn access_sub_service_state(&self) -> u32 {
+            self.sub_service_1.some_state
+        }
+    }
+
+    pub struct Client {}
+}
+
+#[rpc_genie::service]
+mod other_service {
+    pub struct Server {
+        pub some_state: u32,
+    }
+
+    pub struct Client {}
+}
+
+fn main() {
+    let _ = rpc::Server {
+        server_name: "".to_string(),
+        sub_service_1: other_service::Server { some_state: 1 },
+        sub_service_2: other_service::Server { some_state: 2 },
+    };
+
+    let _ = rpc::Client {
+        sub_service_1: other_service::Client {},
+        sub_service_2: other_service::Client {},
+    };
+}
