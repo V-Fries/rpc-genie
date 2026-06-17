@@ -1,5 +1,5 @@
-mod request_handlers;
 mod handles;
+mod request_handlers;
 mod utils;
 
 use super::{Service, SubService};

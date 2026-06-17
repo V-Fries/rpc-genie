@@ -1,7 +1,9 @@
-mod service_parser;
 mod code_generation;
+mod service_parser;
 
-use syn::{Ident, Item, ItemMod, ItemStruct, PatType, Path, Receiver, ReturnType, Token, Visibility};
+use syn::{
+    Ident, Item, ItemMod, ItemStruct, PatType, Path, Receiver, ReturnType, Token, Visibility,
+};
 
 pub struct Service {
     module: ItemMod,
