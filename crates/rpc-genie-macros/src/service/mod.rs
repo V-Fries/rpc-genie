@@ -1,7 +1,7 @@
 mod service_parser;
 mod code_generation;
 
-use syn::{Ident, Item, ItemMod, ItemStruct, PatType, Path, Receiver, Token};
+use syn::{Ident, Item, ItemMod, ItemStruct, PatType, Path, Receiver, ReturnType, Token, Visibility};
 
 pub struct Service {
     module: ItemMod,
@@ -14,9 +14,11 @@ pub struct Service {
 }
 
 struct RemoteMethod {
+    vis: Visibility,
     ident: Ident,
     receiver: Option<Receiver>,
     args: Vec<PatType>,
+    output: ReturnType,
 }
 
 struct SubService {

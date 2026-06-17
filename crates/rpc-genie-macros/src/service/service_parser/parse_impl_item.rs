@@ -149,9 +149,11 @@ fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
     }
 
     let mut remote_method = RemoteMethod {
+        vis: function.vis.clone(),
         ident: function.sig.ident.clone(),
         receiver: None,
         args: Vec::new(),
+        output: function.sig.output.clone(),
     };
 
     let mut inputs = function.sig.inputs.iter();
