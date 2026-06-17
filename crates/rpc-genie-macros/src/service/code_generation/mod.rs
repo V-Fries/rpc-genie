@@ -1,4 +1,5 @@
 mod request_handlers;
+mod handles;
 mod utils;
 
 use super::{Service, SubService};
@@ -135,41 +136,6 @@ impl Service {
             #[doc(hidden)]
             pub struct ClientSubServices<'state> {
                 #client_side_fields
-            }
-        }
-    }
-
-    fn handles(&self) -> TokenStream {
-        let fields_creator = |handle_struct_name| {
-            self.sub_services.iter().fold(
-                TokenStream::new(),
-                |acc,
-                 SubService {
-                     pub_keyword,
-                     name,
-                     colon,
-                     path,
-                 }| {
-                    quote! {
-                        #acc
-                        #pub_keyword #name #colon #path::#handle_struct_name,
-                    }
-                },
-            )
-        };
-
-        let client_handle_fields = fields_creator(quote!(ClientHandle));
-        let server_handle_fields = fields_creator(quote!(ServerHandle));
-
-        quote! {
-            #[doc(hidden)]
-            pub struct ClientHandle {
-                #client_handle_fields
-            }
-
-            #[doc(hidden)]
-            pub struct ServerHandle {
-                #server_handle_fields
             }
         }
     }
