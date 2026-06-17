@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use syn::{Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Type};
 
-use crate::service::RemoteMethod;
+use crate::service::{RemoteMethod, service_parser::error_helpers::create_result};
 
 use super::{ServiceBuilder, combine_errors};
 
@@ -130,7 +130,7 @@ fn push_remote_methods_block_methods(
 ) {
     for item in impl_item.items.iter() {
         if let ImplItem::Fn(function) = item {
-            match push_remote_methods_block_method(function) {
+            match create_remote_method(function) {
                 Err(err) => combine_errors(errors, err),
                 Ok(remote_method) => dst.push(remote_method),
             }
@@ -138,12 +138,14 @@ fn push_remote_methods_block_methods(
     }
 }
 
-fn push_remote_methods_block_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
+fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
+    let mut errors = None;
+
     if !function.attrs.is_empty() {
-        return Err(syn::Error::new_spanned(
-            function,
-            "Remote methods are not allowed to use attributes",
-        ));
+        combine_errors(
+            &mut errors,
+            syn::Error::new_spanned(function, "Remote methods are not allowed to use attributes"),
+        );
     }
 
     let mut remote_method = RemoteMethod {
@@ -163,15 +165,18 @@ fn push_remote_methods_block_method(function: &ImplItemFn) -> syn::Result<Remote
     for input in inputs {
         match input {
             FnArg::Receiver(_) => {
-                return Err(syn::Error::new_spanned(
-                    input,
-                    "rpc_genie crate has a bug, please create an issue with the prototype of your \
-                     method so that we can look into it",
-                ));
+                combine_errors(
+                    &mut errors,
+                    syn::Error::new_spanned(
+                        input,
+                        "rpc_genie crate has a bug, please create an issue with the prototype of \
+                         your method so that we can look into it",
+                    ),
+                );
             }
             FnArg::Typed(typed) => remote_method.args.push(typed.clone()),
         }
     }
 
-    Ok(remote_method)
+    create_result(remote_method, errors)
 }
