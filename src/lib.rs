@@ -2,13 +2,11 @@ use std::{marker::PhantomData, sync::Arc};
 
 pub use rpc_genie_macros::service;
 
-// TODO consider #[doc(hidden)]
 pub enum Error {
     MethodNotFound,
     FailedToDeserializeArg { details: String },
 }
 
-// TODO consider #[doc(hidden)]
 pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[doc(hidden)]
