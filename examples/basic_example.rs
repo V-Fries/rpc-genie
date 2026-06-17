@@ -1,3 +1,5 @@
+// To see the generated code, you can run `cargo expand --example basic_example`
+
 #[rpc_genie::service]
 pub mod rpc {
     // Define other services to include in the current service
@@ -32,6 +34,10 @@ pub mod rpc {
 
         fn access_sub_service_state(&self) -> u32 {
             self.sub_service_1.some_state
+        }
+
+        fn complicated_pattern_arg((a, (b, c)): (u32, (String, f32))) {
+            println!("received: ({a}, ({b}, {c}))");
         }
     }
 
