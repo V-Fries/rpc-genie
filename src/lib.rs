@@ -1,4 +1,4 @@
-use std::{marker::PhantomData, sync::Arc};
+use std::sync::Arc;
 
 pub use rpc_genie_macros::service;
 
@@ -11,11 +11,10 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 
 #[doc(hidden)]
 #[allow(dead_code)] // TODO remove allow dead_code
-pub struct RequestHandler<'state, State, SubServices, Handle> {
+pub struct RequestHandler<'state, State, SubServices> {
     service_path: Arc<String>,
     pub state: &'state State,
     pub sub_services: SubServices,
-    _handle: PhantomData<Handle>,
 }
 
 #[doc(hidden)]

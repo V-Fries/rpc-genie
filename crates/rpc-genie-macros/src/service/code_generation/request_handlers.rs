@@ -45,7 +45,6 @@ fn request_handler(
         &request_handler_struct_name,
         &associated_state_struct_name,
         &associated_sub_service_struct_name,
-        &opposite_handle_struct_name,
     );
 
     let request_handler_impl_block = impl_block(
@@ -72,7 +71,6 @@ fn request_handler_struct(
     request_handler_struct_name: &TokenStream,
     associated_state_struct_name: &TokenStream,
     associated_sub_service_struct_name: &TokenStream,
-    opposite_handle_struct_name: &TokenStream,
 ) -> TokenStream {
     quote! {
         #[doc(hidden)]
@@ -81,7 +79,6 @@ fn request_handler_struct(
                 'state,
                 #associated_state_struct_name,
                 #associated_sub_service_struct_name<'state>,
-                #opposite_handle_struct_name,
             >;
     }
 }
