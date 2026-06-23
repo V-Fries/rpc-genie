@@ -6,8 +6,8 @@ use crate::service::{RemoteMethod, Service, SubService};
 
 impl Service {
     pub fn handles(&self) -> TokenStream {
-        let client_handle = self.handle(quote!(ClientHandle), &self.server_remote_methods);
-        let server_handle = self.handle(quote!(ServerHandle), &self.client_remote_methods);
+        let client_handle = self.handle(quote!(ClientHandle), &self.client_remote_methods);
+        let server_handle = self.handle(quote!(ServerHandle), &self.server_remote_methods);
 
         quote! {
             #server_handle
@@ -18,10 +18,10 @@ impl Service {
     fn handle(
         &self,
         handle_struct_name: TokenStream,
-        opposite_remote_methods: &[RemoteMethod],
+        associated_remote_methods: &[RemoteMethod],
     ) -> TokenStream {
         let struct_fields = self.handle_struct_fields(&handle_struct_name);
-        let methods = methods(&handle_struct_name, opposite_remote_methods);
+        let methods = methods(&handle_struct_name, associated_remote_methods);
 
         quote! {
             pub struct #handle_struct_name {
@@ -53,9 +53,9 @@ impl Service {
 
 fn methods(
     handle_struct_name: &TokenStream,
-    opposite_remote_methods: &[RemoteMethod],
+    associated_remote_methods: &[RemoteMethod],
 ) -> TokenStream {
-    let methods = opposite_remote_methods.iter().map(method);
+    let methods = associated_remote_methods.iter().map(method);
 
     quote! {
         impl #handle_struct_name {
