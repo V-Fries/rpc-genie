@@ -5,26 +5,26 @@ use syn::ReturnType;
 use crate::service::{RemoteMethod, Service, SubService};
 
 impl Service {
-    pub fn handles(&self) -> TokenStream {
-        let client_handle = self.handle(quote!(ClientHandle), &self.client_remote_methods);
-        let server_handle = self.handle(quote!(ServerHandle), &self.server_remote_methods);
+    pub fn stubs(&self) -> TokenStream {
+        let client_stub = self.stub(quote!(ClientStub), &self.client_remote_methods);
+        let server_stub = self.stub(quote!(ServerStub), &self.server_remote_methods);
 
         quote! {
-            #server_handle
-            #client_handle
+            #server_stub
+            #client_stub
         }
     }
 
-    fn handle(
+    fn stub(
         &self,
-        handle_struct_name: TokenStream,
+        stub_struct_name: TokenStream,
         associated_remote_methods: &[RemoteMethod],
     ) -> TokenStream {
-        let struct_fields = self.handle_struct_fields(&handle_struct_name);
-        let methods = methods(&handle_struct_name, associated_remote_methods);
+        let struct_fields = self.stub_struct_fields(&stub_struct_name);
+        let methods = methods(&stub_struct_name, associated_remote_methods);
 
         quote! {
-            pub struct #handle_struct_name {
+            pub struct #stub_struct_name {
                 #struct_fields
             }
 
@@ -32,7 +32,7 @@ impl Service {
         }
     }
 
-    fn handle_struct_fields(&self, handle_struct_name: &TokenStream) -> TokenStream {
+    fn stub_struct_fields(&self, stub_struct_name: &TokenStream) -> TokenStream {
         self.sub_services.iter().fold(
             TokenStream::new(),
             |acc,
@@ -44,7 +44,7 @@ impl Service {
              }| {
                 quote! {
                     #acc
-                    #pub_keyword #name #colon #path::#handle_struct_name,
+                    #pub_keyword #name #colon #path::#stub_struct_name,
                 }
             },
         )
@@ -52,13 +52,13 @@ impl Service {
 }
 
 fn methods(
-    handle_struct_name: &TokenStream,
+    stub_struct_name: &TokenStream,
     associated_remote_methods: &[RemoteMethod],
 ) -> TokenStream {
     let methods = associated_remote_methods.iter().map(method);
 
     quote! {
-        impl #handle_struct_name {
+        impl #stub_struct_name {
             #(#methods)*
         }
     }

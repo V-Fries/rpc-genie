@@ -453,7 +453,7 @@ fn with_sub_service() {
 }
 
 #[test]
-fn with_client_handle() {
+fn with_client_stub() {
     let service = quote! {
         #[rpc_genie::service]
         pub mod counter {
@@ -491,7 +491,7 @@ fn with_client_handle() {
                     *self.count.lock().await
                 }
 
-                async fn subscribe(&self, client: rpc_genie::ClientHandle<Client>) {
+                async fn subscribe(&self, client: rpc_genie::ClientStub<Client>) {
                     let count_lock = self.count.lock().await;
                     client.change_event(count_lock).await;
                     self.subscribed_clients.add(client).await
@@ -554,7 +554,7 @@ fn with_client_handle() {
                     receiver: Some("& self".to_owned()),
                     args: vec![ComparisonArg {
                         pat: "client".to_owned(),
-                        ty: "rpc_genie :: ClientHandle < Client >".to_owned(),
+                        ty: "rpc_genie :: ClientStub < Client >".to_owned(),
                     }],
                 },
             ],

@@ -1,5 +1,5 @@
-mod handles;
 mod request_handlers;
+mod stubs;
 mod utils;
 
 use super::{Service, SubService};
@@ -38,14 +38,14 @@ impl Service {
         let server_and_clients_structs = self.server_and_clients_structs();
         let sub_services_structs = self.sub_services_structs();
         let request_handlers = self.request_handlers();
-        let handles = self.handles();
+        let stubs = self.stubs();
         let rest = &self.rest;
 
         quote! {
             #server_and_clients_structs
             #sub_services_structs
             #request_handlers
-            #handles
+            #stubs
             #(#rest)*
         }
     }

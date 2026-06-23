@@ -19,11 +19,11 @@ pub struct RequestHandler<'state, State, SubServices> {
 
 #[doc(hidden)]
 #[allow(async_fn_in_trait)]
-pub trait HandleRequest<Handle> {
+pub trait HandleRequest<Stub> {
     async fn handle_request(
         &self,
         method_name: &str,
-        __rpc_handle__: Handle,
+        __rpc_stub__: Stub,
         __rpc_args__: Args,
     ) -> Result<ReturnValue>;
 }

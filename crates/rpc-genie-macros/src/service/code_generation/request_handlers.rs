@@ -6,14 +6,14 @@ use crate::service::{RemoteMethod, SubService};
 use super::{Service, utils::ident_to_lit_str};
 
 impl Service {
-    /// Generate requests handles structs and implementations
+    /// Generate requests handlers structs and implementations
     pub fn request_handlers(&self) -> TokenStream {
         let server_request_handler = request_handler(
             quote!(ServerRequestHandler),
             quote!(Server),
             quote!(ServerSubServices),
             &self.server_remote_methods,
-            quote!(ClientHandle),
+            quote!(ClientStub),
             &self.sub_services,
         );
         let client_request_handler = request_handler(
@@ -21,7 +21,7 @@ impl Service {
             quote!(Client),
             quote!(ClientSubServices),
             &self.client_remote_methods,
-            quote!(ServerHandle),
+            quote!(ServerStub),
             &self.sub_services,
         );
 
@@ -38,7 +38,7 @@ fn request_handler(
     associated_state_struct_name: TokenStream,
     associated_sub_service_struct_name: TokenStream,
     associated_remote_methods: &[RemoteMethod],
-    opposite_handle_struct_name: TokenStream,
+    opposite_stub_struct_name: TokenStream,
     sub_services: &[SubService],
 ) -> TokenStream {
     let request_handler_struct = request_handler_struct(
@@ -51,12 +51,12 @@ fn request_handler(
         &request_handler_struct_name,
         &associated_state_struct_name,
         associated_remote_methods,
-        &opposite_handle_struct_name,
+        &opposite_stub_struct_name,
     );
 
     let sub_service_handle_request_impl = sub_service_handle_request_impl(
         &associated_sub_service_struct_name,
-        &opposite_handle_struct_name,
+        &opposite_stub_struct_name,
         sub_services,
     );
 
@@ -87,18 +87,18 @@ fn impl_block(
     request_handler_struct_name: &TokenStream,
     associated_state_struct_name: &TokenStream,
     associated_remote_methods: &[RemoteMethod],
-    opposite_handle_struct_name: &TokenStream,
+    opposite_stub_struct_name: &TokenStream,
 ) -> TokenStream {
     let fn_content = impl_block_fn_content(associated_state_struct_name, associated_remote_methods);
 
     quote! {
-        impl<'state> rpc_genie::HandleRequest<#opposite_handle_struct_name>
+        impl<'state> rpc_genie::HandleRequest<#opposite_stub_struct_name>
             for #request_handler_struct_name<'state>
         {
             async fn handle_request(
                 &self,
                 method_path: &str,
-                __rpc_client__: #opposite_handle_struct_name,
+                __rpc_client__: #opposite_stub_struct_name,
                 mut __rpc_args__: rpc_genie::Args,
             ) -> rpc_genie::Result<rpc_genie::ReturnValue> {
                 #fn_content
@@ -170,19 +170,19 @@ fn match_branch(
 
 fn sub_service_handle_request_impl(
     associated_sub_service_struct_name: &TokenStream,
-    opposite_handle_struct_name: &TokenStream,
+    opposite_stub_struct_name: &TokenStream,
     sub_services: &[SubService],
 ) -> TokenStream {
     let fn_content = sub_service_handle_request_fn_content(sub_services);
 
     quote! {
-        impl<'state> rpc_genie::HandleRequest<#opposite_handle_struct_name>
+        impl<'state> rpc_genie::HandleRequest<#opposite_stub_struct_name>
             for #associated_sub_service_struct_name<'state>
         {
             async fn handle_request(
                 &self,
                 method_path: &str,
-                __rpc_client__: #opposite_handle_struct_name,
+                __rpc_client__: #opposite_stub_struct_name,
                 __rpc_args__: rpc_genie::Args,
             ) -> rpc_genie::Result<rpc_genie::ReturnValue> {
                 #fn_content
