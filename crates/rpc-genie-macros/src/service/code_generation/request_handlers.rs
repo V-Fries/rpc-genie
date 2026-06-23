@@ -41,33 +41,33 @@ fn request_handler(
     opposite_stub_struct_name: TokenStream,
     sub_services: &[SubService],
 ) -> TokenStream {
-    let request_handler_struct = request_handler_struct(
+    let request_handler_type_definition = request_handler_type_definition(
         &request_handler_struct_name,
         &associated_state_struct_name,
         &associated_sub_service_struct_name,
     );
 
-    let request_handler_impl_block = impl_block(
+    let impl_handle_request_for_request_handler = impl_handle_request_for_request_handler(
         &request_handler_struct_name,
         &associated_state_struct_name,
         associated_remote_methods,
         &opposite_stub_struct_name,
     );
 
-    let sub_service_handle_request_impl = sub_service_handle_request_impl(
+    let impl_handle_request_for_sub_service = impl_handle_request_for_sub_service(
         &associated_sub_service_struct_name,
         &opposite_stub_struct_name,
         sub_services,
     );
 
     quote! {
-        #request_handler_struct
-        #request_handler_impl_block
-        #sub_service_handle_request_impl
+        #request_handler_type_definition
+        #impl_handle_request_for_request_handler
+        #impl_handle_request_for_sub_service
     }
 }
 
-fn request_handler_struct(
+fn request_handler_type_definition(
     request_handler_struct_name: &TokenStream,
     associated_state_struct_name: &TokenStream,
     associated_sub_service_struct_name: &TokenStream,
@@ -83,7 +83,7 @@ fn request_handler_struct(
     }
 }
 
-fn impl_block(
+fn impl_handle_request_for_request_handler(
     request_handler_struct_name: &TokenStream,
     associated_state_struct_name: &TokenStream,
     associated_remote_methods: &[RemoteMethod],
@@ -168,7 +168,7 @@ fn match_branch(
     }
 }
 
-fn sub_service_handle_request_impl(
+fn impl_handle_request_for_sub_service(
     associated_sub_service_struct_name: &TokenStream,
     opposite_stub_struct_name: &TokenStream,
     sub_services: &[SubService],
