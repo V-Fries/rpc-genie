@@ -1,14 +1,14 @@
 // To see the generated code, you can run `cargo expand --example basic_example`
 
 #[rpc_genie::service]
-pub mod rpc {
+pub mod service_a {
     // Define other services to include in the current service
     sub_services! {
         // Can have any number of sub services
         // If we use the same service module multiple times, the state is not shared (i.e. it is
         // duplicated)
-        pub sub_service_1: super::other_service,
-        pub sub_service_2: super::other_service,
+        pub sub_service_1: super::service_b,
+        pub sub_service_2: super::service_b,
     }
 
     pub struct Server {
@@ -45,7 +45,7 @@ pub mod rpc {
 }
 
 #[rpc_genie::service]
-mod other_service {
+mod service_b {
     pub struct Server {
         pub some_state: u32,
     }
@@ -54,14 +54,14 @@ mod other_service {
 }
 
 fn main() {
-    let _ = rpc::Server {
+    let _ = service_a::Server {
         server_name: "".to_string(),
-        sub_service_1: other_service::Server { some_state: 1 },
-        sub_service_2: other_service::Server { some_state: 2 },
+        sub_service_1: service_b::Server { some_state: 1 },
+        sub_service_2: service_b::Server { some_state: 2 },
     };
 
-    let _ = rpc::Client {
-        sub_service_1: other_service::Client {},
-        sub_service_2: other_service::Client {},
+    let _ = service_a::Client {
+        sub_service_1: service_b::Client {},
+        sub_service_2: service_b::Client {},
     };
 }
