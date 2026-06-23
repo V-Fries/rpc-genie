@@ -1,17 +1,10 @@
 use std::ops::Deref;
 
-use syn::{Attribute, FnArg, Ident, ImplItem, ImplItemFn, Item, ItemImpl, PatType, Receiver, Type};
+use syn::{Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Type};
 
-use super::{ServiceBuilder, combine_errors, create_result};
+use crate::service::{RemoteMethod, service_parser::error_helpers::create_result};
 
-// TODO remove allow(dead_code)
-#[allow(dead_code)]
-pub struct RemoteMethod {
-    pub ident: Ident,
-    pub receiver: Option<Receiver>,
-    pub args: Vec<PatType>,
-    pub method: ImplItemFn,
-}
+use super::{ServiceBuilder, combine_errors};
 
 enum ImplForServerOrClient {
     Server,
@@ -21,56 +14,62 @@ enum ImplForServerOrClient {
 
 pub fn parse_impl_item(
     service: &mut ServiceBuilder,
-    impl_item: ItemImpl,
+    mut impl_item: ItemImpl,
     errors: &mut Option<syn::Error>,
 ) {
-    let has_remote_methods_attr = match has_remote_methods_attr(&impl_item) {
-        Ok(has_remote_methods_attr) => has_remote_methods_attr,
-        Err(err) => return combine_errors(errors, err),
-    };
+    let has_remote_methods_attr = has_remote_methods_attr(&impl_item, errors);
 
     match is_impl_block_for_server_or_client(&impl_item) {
-        ImplForServerOrClient::Server => push_remote_methods_block_methods(
-            &mut service.server_remote_methods,
-            &impl_item,
-            errors,
-        ),
-        ImplForServerOrClient::Client => push_remote_methods_block_methods(
-            &mut service.client_remote_methods,
-            &impl_item,
-            errors,
-        ),
+        ImplForServerOrClient::Server => {
+            if has_remote_methods_attr {
+                push_remote_methods_block_methods(
+                    &mut service.server_remote_methods,
+                    &impl_item,
+                    errors,
+                )
+            }
+        }
+        ImplForServerOrClient::Client => {
+            if has_remote_methods_attr {
+                push_remote_methods_block_methods(
+                    &mut service.client_remote_methods,
+                    &impl_item,
+                    errors,
+                )
+            }
+        }
         ImplForServerOrClient::Neither => {
             if has_remote_methods_attr {
                 combine_errors(
                     errors,
                     syn::Error::new_spanned(
-                        impl_item,
+                        impl_item.clone(),
                         "Only the Server and Client structs may use the #[remote_methods] attribute",
                     ),
                 );
-            } else {
-                service.rest.push(Item::Impl(impl_item));
             }
         }
     }
+
+    impl_item
+        .attrs
+        .retain(|attr| !attr.path().is_ident("remote_methods"));
+    service.rest.push(Item::Impl(impl_item));
 }
 
-fn has_remote_methods_attr(impl_item: &ItemImpl) -> syn::Result<bool> {
+fn has_remote_methods_attr(impl_item: &ItemImpl, errors: &mut Option<syn::Error>) -> bool {
     let maybe_remote_method_attr = impl_item
         .attrs
         .iter()
         .filter(|attr| attr.path().is_ident("remote_methods"))
         .collect::<Vec<_>>();
 
-    let mut errors = None;
-
     match maybe_remote_method_attr.as_slice() {
-        [] => return Ok(false),
-        [remote_method_attr] => check_remote_methods_attr_args(remote_method_attr, &mut errors),
+        [] => return false,
+        [remote_method_attr] => check_remote_methods_attr_args(remote_method_attr, errors),
         _ => {
             combine_errors(
-                &mut errors,
+                errors,
                 syn::Error::new_spanned(
                     impl_item,
                     "#[remote_methods] attribute should only be present once",
@@ -81,7 +80,7 @@ fn has_remote_methods_attr(impl_item: &ItemImpl) -> syn::Result<bool> {
 
     if impl_item.attrs.len() != 1 {
         combine_errors(
-            &mut errors,
+            errors,
             syn::Error::new_spanned(
                 impl_item,
                 "When #[remote_methods] attribute is used, other attributes are not allowed",
@@ -89,7 +88,7 @@ fn has_remote_methods_attr(impl_item: &ItemImpl) -> syn::Result<bool> {
         );
     }
 
-    create_result(true, errors)
+    true
 }
 
 /// Returns whether the impl block concerns the Server or the Client struct, or something else
@@ -131,7 +130,7 @@ fn push_remote_methods_block_methods(
 ) {
     for item in impl_item.items.iter() {
         if let ImplItem::Fn(function) = item {
-            match push_remote_methods_block_method(function) {
+            match create_remote_method(function) {
                 Err(err) => combine_errors(errors, err),
                 Ok(remote_method) => dst.push(remote_method),
             }
@@ -139,19 +138,22 @@ fn push_remote_methods_block_methods(
     }
 }
 
-fn push_remote_methods_block_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
+fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
+    let mut errors = None;
+
     if !function.attrs.is_empty() {
-        return Err(syn::Error::new_spanned(
-            function,
-            "Remote methods are not allowed to use attributes",
-        ));
+        combine_errors(
+            &mut errors,
+            syn::Error::new_spanned(function, "Remote methods are not allowed to use attributes"),
+        );
     }
 
     let mut remote_method = RemoteMethod {
+        vis: function.vis.clone(),
         ident: function.sig.ident.clone(),
         receiver: None,
         args: Vec::new(),
-        method: function.clone(),
+        output: function.sig.output.clone(),
     };
 
     let mut inputs = function.sig.inputs.iter();
@@ -165,15 +167,18 @@ fn push_remote_methods_block_method(function: &ImplItemFn) -> syn::Result<Remote
     for input in inputs {
         match input {
             FnArg::Receiver(_) => {
-                return Err(syn::Error::new_spanned(
-                    input,
-                    "rpc_genie crate has a bug, please create an issue with the prototype of your \
-                     method so that we can look into it",
-                ));
+                combine_errors(
+                    &mut errors,
+                    syn::Error::new_spanned(
+                        input,
+                        "rpc_genie crate has a bug, please create an issue with the prototype of \
+                         your method so that we can look into it",
+                    ),
+                );
             }
             FnArg::Typed(typed) => remote_method.args.push(typed.clone()),
         }
     }
 
-    Ok(remote_method)
+    create_result(remote_method, errors)
 }

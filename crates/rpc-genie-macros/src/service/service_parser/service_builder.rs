@@ -2,7 +2,9 @@ use std::collections::HashSet;
 
 use syn::{Ident, Item, ItemMod, ItemStruct};
 
-use super::{RemoteMethod, Service, SubService, combine_errors};
+use crate::service::{RemoteMethod, SubService};
+
+use super::{Service, combine_errors};
 
 #[derive(Default)]
 pub struct ServiceBuilder {

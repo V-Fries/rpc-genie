@@ -1,12 +1,13 @@
-mod module_parser;
-
 use proc_macro::TokenStream;
+use quote::quote;
 
-use crate::module_parser::Service;
+use crate::service::Service;
+
+mod service;
 
 #[proc_macro_attribute]
 pub fn service(_attr: TokenStream, tokens: TokenStream) -> TokenStream {
-    let _service = syn::parse_macro_input!(tokens as Service);
+    let service = syn::parse_macro_input!(tokens as Service);
 
-    todo!()
+    quote!(#service).into()
 }

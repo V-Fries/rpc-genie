@@ -1,8 +1,10 @@
 use syn::{
-    Ident, Item, MacroDelimiter, Path, Token,
+    Item, MacroDelimiter, Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
 };
+
+use crate::service::SubService;
 
 use super::{ServiceBuilder, combine_errors};
 
@@ -54,15 +56,6 @@ impl Parse for SubServices {
             entries: input.parse_terminated(SubService::parse, Token![,])?,
         })
     }
-}
-
-// TODO remove allow(dead_code)
-#[allow(dead_code)]
-pub struct SubService {
-    pub pub_keyword: Option<Token![pub]>,
-    pub name: Ident,
-    pub colon: Token![:],
-    pub path: Path,
 }
 
 impl Parse for SubService {
