@@ -29,6 +29,25 @@ pub trait HandleRequest<Stub> {
 }
 
 #[doc(hidden)]
+pub trait AsRequestHandler<'state, SubServices: SubServicesFromState<'state, Self>>:
+    Sized
+{
+    fn as_request_handler(
+        &'state self,
+        service_path: Option<Arc<String>>,
+    ) -> RequestHandler<'state, Self, SubServices> {
+        RequestHandler {
+            state: self,
+            sub_services: SubServices::from_state(
+                self,
+                service_path.as_deref().map(String::as_str),
+            ),
+            service_path,
+        }
+    }
+}
+
+#[doc(hidden)]
 pub struct Args {}
 
 impl Args {
