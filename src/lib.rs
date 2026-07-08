@@ -12,7 +12,7 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 #[doc(hidden)]
 #[allow(dead_code)] // TODO remove allow dead_code
 pub struct RequestHandler<'state, State, SubServices> {
-    service_path: Arc<String>,
+    service_path: Option<Arc<String>>,
     pub state: &'state State,
     pub sub_services: SubServices,
 }
