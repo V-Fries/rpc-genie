@@ -147,14 +147,17 @@ impl Service {
 }
 
 fn as_request_handler_impl_blocks() -> TokenStream {
-    let impl_block_creator = |state_struct_name, associated_sub_services_struct_name| {
+    fn impl_block_creator(
+        state_struct_name: TokenStream,
+        associated_sub_services_struct_name: TokenStream,
+    ) -> TokenStream {
         quote! {
             impl<'state> rpc_genie::AsRequestHandler<
                 'state,
                 #associated_sub_services_struct_name<'state>
             > for #state_struct_name { }
         }
-    };
+    }
 
     let impl_as_request_handler_for_server =
         impl_block_creator(quote!(Server), quote!(ServerSubServices));
