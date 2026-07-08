@@ -48,6 +48,11 @@ pub trait AsRequestHandler<'state, SubServices: SubServicesFromState<'state, Sel
 }
 
 #[doc(hidden)]
+pub trait SubServicesFromState<'state, State> {
+    fn from_state(state: &'state State, service_path: Option<&str>) -> Self;
+}
+
+#[doc(hidden)]
 pub struct Args {}
 
 impl Args {

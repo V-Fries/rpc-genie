@@ -1,5 +1,6 @@
 mod request_handlers;
 mod stubs;
+mod sub_services_from_state_impl_blocks;
 mod utils;
 
 use super::{Service, SubService};
@@ -40,6 +41,7 @@ impl Service {
         let request_handlers = self.request_handlers();
         let stubs = self.stubs();
         let as_request_handler_impl_blocks = as_request_handler_impl_blocks();
+        let sub_services_from_state_impl_blocks = self.sub_services_from_state_impl_blocks();
         let rest = &self.rest;
 
         quote! {
@@ -48,6 +50,7 @@ impl Service {
             #request_handlers
             #stubs
             #as_request_handler_impl_blocks
+            #sub_services_from_state_impl_blocks
             #(#rest)*
         }
     }
