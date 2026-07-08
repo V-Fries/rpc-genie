@@ -29,9 +29,7 @@ pub trait HandleRequest<Stub> {
 }
 
 #[doc(hidden)]
-pub trait AsRequestHandler<'state, SubServices: SubServicesFromState<'state, Self>>:
-    Sized
-{
+pub trait AsRequestHandler<'state, SubServices: SubServicesFromState<'state, Self>>: Sized {
     fn as_request_handler(
         &'state self,
         service_path: Option<Arc<String>>,
