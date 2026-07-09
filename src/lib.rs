@@ -12,7 +12,7 @@ pub type Result<T, E = Error> = core::result::Result<T, E>;
 #[doc(hidden)]
 #[allow(dead_code)] // TODO remove allow dead_code
 pub struct RequestHandler<'state, State, SubServices> {
-    service_path: Arc<String>,
+    service_path: Option<Arc<String>>,
     pub state: &'state State,
     pub sub_services: SubServices,
 }
@@ -26,6 +26,28 @@ pub trait HandleRequest<Stub> {
         __rpc_stub__: Stub,
         __rpc_args__: Args,
     ) -> Result<ReturnValue>;
+}
+
+#[doc(hidden)]
+pub trait AsRequestHandler<'state, SubServices: SubServicesFromState<'state, Self>>: Sized {
+    fn as_request_handler(
+        &'state self,
+        service_path: Option<Arc<String>>,
+    ) -> RequestHandler<'state, Self, SubServices> {
+        RequestHandler {
+            state: self,
+            sub_services: SubServices::from_state(
+                self,
+                service_path.as_deref().map(String::as_str),
+            ),
+            service_path,
+        }
+    }
+}
+
+#[doc(hidden)]
+pub trait SubServicesFromState<'state, State> {
+    fn from_state(state: &'state State, service_path: Option<&str>) -> Self;
 }
 
 #[doc(hidden)]
