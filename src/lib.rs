@@ -1,3 +1,5 @@
+mod frame;
+
 use std::sync::Arc;
 
 pub use rpc_genie_macros::service;
