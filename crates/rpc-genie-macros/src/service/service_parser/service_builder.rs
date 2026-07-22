@@ -124,12 +124,9 @@ fn get_fields_name_that_are_also_sub_services_names<'a>(
         .iter()
         .flat_map(|s| s.fields.iter())
         .filter_map(|field| {
-            field.ident.as_ref().and_then(|ident| {
-                if sub_services_names.contains(&ident.to_string()) {
-                    Some(ident)
-                } else {
-                    None
-                }
-            })
+            field
+                .ident
+                .as_ref()
+                .filter(|ident| sub_services_names.contains(&ident.to_string()))
         })
 }
