@@ -72,24 +72,24 @@ impl Frame {
     pub async fn read_frame<const MAX_FRAME_SIZE: usize>(
         stream: &mut BufReader<impl AsyncRead + Unpin>,
     ) -> Result<Self, ReadError> {
-        let size = stream.read_u64().await.map_err(ReadError::ReadFrameSize)?;
+        let size = stream.read_u64().await.map_err(ReadError::ReadFrameSize)? as usize;
 
-        if size as usize > MAX_FRAME_SIZE {
+        if size > MAX_FRAME_SIZE {
             return Err(ReadError::FrameTooBig {
-                size: size as usize,
+                size,
                 max_size: MAX_FRAME_SIZE,
             });
         }
 
-        let mut frame_bytes = Vec::<u8>::with_capacity(size as usize);
+        let mut frame_bytes = Vec::<u8>::with_capacity(size);
         stream
-            .take(size)
+            .take(size as u64)
             .read_to_end(&mut frame_bytes)
             .await
             .map_err(ReadError::ReadFrame)?;
-        if frame_bytes.len() != size as usize {
+        if frame_bytes.len() != size {
             return Err(ReadError::MissingData {
-                expected_size: size as usize,
+                expected_size: size,
                 data_size: frame_bytes.len(),
             });
         }
