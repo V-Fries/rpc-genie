@@ -25,7 +25,7 @@ mod rpc_request {
         let (mut stream_1, mut stream_2) = create_duplex_buf_stream();
 
         let rpc_request = RpcRequestBuilder::new()
-            .method("method_path")
+            .method_path("method_path")
             .id(0)
             .add_param(&42u32)
             .add_param(&Foo {
@@ -49,7 +49,7 @@ mod rpc_request {
                 _ => panic!("Received unexpected frame"),
             };
 
-        assert_eq!("method_path", rpc_request_reader.method());
+        assert_eq!("method_path", rpc_request_reader.method_path());
         assert_eq!(rpc_request_reader.id(), 0);
         assert_eq!(42u32, rpc_request_reader.read_param().unwrap());
         assert_eq!(
@@ -66,7 +66,10 @@ mod rpc_request {
     async fn method_without_params() {
         let (mut stream_1, mut stream_2) = create_duplex_buf_stream();
 
-        let rpc_request = RpcRequestBuilder::new().method("method_path").id(1).build();
+        let rpc_request = RpcRequestBuilder::new()
+            .method_path("method_path")
+            .id(1)
+            .build();
         Frame::RpcRequest(rpc_request)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
@@ -82,7 +85,7 @@ mod rpc_request {
                 _ => panic!("Received unexpected frame"),
             };
 
-        assert_eq!("method_path", rpc_request_reader.method());
+        assert_eq!("method_path", rpc_request_reader.method_path());
         assert_eq!(rpc_request_reader.id(), 1);
     }
 
@@ -91,7 +94,7 @@ mod rpc_request {
         let (mut stream_1, mut stream_2) = create_duplex_buf_stream();
 
         let rpc_request = RpcRequestBuilder::new()
-            .method("method_path")
+            .method_path("method_path")
             .id(1)
             .add_param(&42u32)
             .add_param(&546u128)
@@ -102,7 +105,10 @@ mod rpc_request {
             .await
             .unwrap();
 
-        let rpc_request = RpcRequestBuilder::new().method("method_path").id(2).build();
+        let rpc_request = RpcRequestBuilder::new()
+            .method_path("method_path")
+            .id(2)
+            .build();
         Frame::RpcRequest(rpc_request)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
@@ -128,7 +134,7 @@ mod rpc_request {
                 _ => panic!("Received unexpected frame"),
             };
 
-        assert_eq!("method_path", rpc_request_reader_1.method());
+        assert_eq!("method_path", rpc_request_reader_1.method_path());
         assert_eq!(rpc_request_reader_1.id(), 1);
         assert_eq!(42u32, rpc_request_reader_1.read_param().unwrap());
         assert_eq!(546u128, rpc_request_reader_1.read_param().unwrap());
@@ -137,7 +143,7 @@ mod rpc_request {
             rpc_request_reader_1.read_param::<String>().unwrap()
         );
 
-        assert_eq!("method_path", rpc_request_reader_2.method());
+        assert_eq!("method_path", rpc_request_reader_2.method_path());
         assert_eq!(rpc_request_reader_2.id(), 2);
     }
 }
@@ -259,7 +265,7 @@ mod rpc_response {
         let response = RpcResponseBuilder::new()
             .id(1)
             .set_error(RpcError::NoSuchMethod {
-                method_name: "test".to_owned(),
+                method_path: "test".to_owned(),
             })
             .build();
         Frame::RpcResponse(response)
@@ -280,7 +286,7 @@ mod rpc_response {
         assert_eq!(rpc_response.id(), 1);
         assert_eq!(
             RpcError::NoSuchMethod {
-                method_name: "test".to_owned()
+                method_path: "test".to_owned()
             },
             rpc_response
                 .get_return_value::<()>()
@@ -300,7 +306,7 @@ mod max_size_check {
 
         let request = RpcRequestBuilder::new()
             .id(0)
-            .method("test")
+            .method_path("test")
             .add_param(&42)
             .build();
         match Frame::RpcRequest(request)
@@ -319,7 +325,7 @@ mod max_size_check {
 
         let request = RpcRequestBuilder::new()
             .id(0)
-            .method("test")
+            .method_path("test")
             .add_param(&42)
             .build();
         Frame::RpcRequest(request)

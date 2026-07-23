@@ -7,7 +7,7 @@ use super::RpcRequest;
 use std::io::Cursor;
 
 pub struct RpcRequestReader {
-    method: String,
+    method_path: String,
     params: Cursor<Box<[u8]>>,
     id: RpcRequestId,
 }
@@ -15,7 +15,7 @@ pub struct RpcRequestReader {
 impl From<RpcRequest> for RpcRequestReader {
     fn from(raw_rpc_request: RpcRequest) -> Self {
         Self {
-            method: raw_rpc_request.method,
+            method_path: raw_rpc_request.method_path,
             params: Cursor::new(raw_rpc_request.params),
             id: raw_rpc_request.request_id,
         }
@@ -29,8 +29,8 @@ impl RpcRequestReader {
     }
 
     /// Getter for the request method path
-    pub fn method(&self) -> &str {
-        &self.method
+    pub fn method_path(&self) -> &str {
+        &self.method_path
     }
 
     /// Tries to read a param from the request.

@@ -12,7 +12,7 @@ use crate::frame::RpcRequestId;
 
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct RpcRequest {
-    method: String,
+    method_path: String,
     params: Box<[u8]>,
     request_id: RpcRequestId,
 }

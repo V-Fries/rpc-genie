@@ -4,8 +4,8 @@ use super::RpcRequest;
 
 pub struct Uninit;
 
-pub struct RpcRequestBuilder<RpcRequestId, Method> {
-    method: Method,
+pub struct RpcRequestBuilder<RpcRequestId, MethodPath> {
+    method_path: MethodPath,
     params: Vec<u8>,
     request_id: RpcRequestId,
 }
@@ -13,7 +13,7 @@ pub struct RpcRequestBuilder<RpcRequestId, Method> {
 impl Default for RpcRequestBuilder<Uninit, Uninit> {
     fn default() -> Self {
         Self {
-            method: Uninit,
+            method_path: Uninit,
             params: Vec::new(),
             request_id: Uninit,
         }
@@ -29,18 +29,18 @@ impl RpcRequestBuilder<Uninit, Uninit> {
 impl RpcRequestBuilder<RpcRequestId, String> {
     pub fn build(self) -> RpcRequest {
         RpcRequest {
-            method: self.method,
+            method_path: self.method_path,
             params: self.params.into_boxed_slice(),
             request_id: self.request_id,
         }
     }
 }
 
-impl<Method> RpcRequestBuilder<Uninit, Method> {
+impl<MethodPath> RpcRequestBuilder<Uninit, MethodPath> {
     /// Sets the rpc request id to the given id (see [RpcRequestId])
-    pub fn id(self, id: impl Into<RpcRequestId>) -> RpcRequestBuilder<RpcRequestId, Method> {
+    pub fn id(self, id: impl Into<RpcRequestId>) -> RpcRequestBuilder<RpcRequestId, MethodPath> {
         RpcRequestBuilder {
-            method: self.method,
+            method_path: self.method_path,
             params: self.params,
             request_id: id.into(),
         }
@@ -49,16 +49,16 @@ impl<Method> RpcRequestBuilder<Uninit, Method> {
 
 impl<RpcRequestId> RpcRequestBuilder<RpcRequestId, Uninit> {
     /// Setter for the method path
-    pub fn method(self, method: impl Into<String>) -> RpcRequestBuilder<RpcRequestId, String> {
+    pub fn method_path(self, method: impl Into<String>) -> RpcRequestBuilder<RpcRequestId, String> {
         RpcRequestBuilder {
-            method: method.into(),
+            method_path: method.into(),
             params: self.params,
             request_id: self.request_id,
         }
     }
 }
 
-impl<RpcRequestId, Method> RpcRequestBuilder<RpcRequestId, Method> {
+impl<RpcRequestId, MethodPath> RpcRequestBuilder<RpcRequestId, MethodPath> {
     /// Adds a param that the rpc request function will use.
     ///
     /// # Implementation detail

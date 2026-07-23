@@ -9,8 +9,8 @@ pub enum ReturnValueError {
 #[derive(Debug, thiserror::Error, serde::Deserialize, serde::Serialize)]
 #[cfg_attr(test, derive(PartialEq, Eq))]
 pub enum RpcError {
-    #[error("No method named \"{method_name}\" was found")]
-    NoSuchMethod { method_name: String },
+    #[error("No method at path \"{method_path}\" was found")]
+    NoSuchMethod { method_path: String },
     #[error("Connection error")]
     ConnectionError,
 }
