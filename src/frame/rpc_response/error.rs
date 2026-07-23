@@ -11,8 +11,6 @@ pub enum ReturnValueError {
 pub enum RpcError {
     #[error("No method at path \"{method_path}\" was found")]
     NoSuchMethod { method_path: String },
-    #[error("Connection error")]
-    ConnectionError,
 }
 
 #[cfg(test)]
