@@ -6,7 +6,7 @@ pub struct Uninit;
 
 pub struct RpcRequestBuilder<RpcRequestId, MethodPath> {
     method_path: MethodPath,
-    params: Vec<u8>,
+    args: Vec<u8>,
     request_id: RpcRequestId,
 }
 
@@ -14,15 +14,9 @@ impl Default for RpcRequestBuilder<Uninit, Uninit> {
     fn default() -> Self {
         Self {
             method_path: Uninit,
-            params: Vec::new(),
+            args: Vec::new(),
             request_id: Uninit,
         }
-    }
-}
-
-impl RpcRequestBuilder<Uninit, Uninit> {
-    pub fn new() -> Self {
-        Self::default()
     }
 }
 
@@ -30,8 +24,8 @@ impl RpcRequestBuilder<RpcRequestId, String> {
     pub fn build(self) -> RpcRequest {
         RpcRequest {
             method_path: self.method_path,
-            params: self.params.into_boxed_slice(),
-            request_id: self.request_id,
+            args: self.args.into_boxed_slice(),
+            id: self.request_id,
         }
     }
 }
@@ -41,7 +35,7 @@ impl<MethodPath> RpcRequestBuilder<Uninit, MethodPath> {
     pub fn id(self, id: impl Into<RpcRequestId>) -> RpcRequestBuilder<RpcRequestId, MethodPath> {
         RpcRequestBuilder {
             method_path: self.method_path,
-            params: self.params,
+            args: self.args,
             request_id: id.into(),
         }
     }
@@ -52,7 +46,7 @@ impl<RpcRequestId> RpcRequestBuilder<RpcRequestId, Uninit> {
     pub fn method_path(self, method: impl Into<String>) -> RpcRequestBuilder<RpcRequestId, String> {
         RpcRequestBuilder {
             method_path: method.into(),
-            params: self.params,
+            args: self.args,
             request_id: self.request_id,
         }
     }
@@ -69,7 +63,7 @@ impl<RpcRequestId, MethodPath> RpcRequestBuilder<RpcRequestId, MethodPath> {
     pub fn add_param(mut self, param: &impl serde::Serialize) -> Self {
         let serialized_param = rmp_serde::to_vec_named(param).expect("Failed to serialize param");
 
-        self.params.extend(serialized_param);
+        self.args.extend(serialized_param);
         self
     }
 }
