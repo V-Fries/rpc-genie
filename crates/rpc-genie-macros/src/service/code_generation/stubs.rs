@@ -21,14 +21,19 @@ impl Service {
         associated_remote_methods: &[RemoteMethod],
     ) -> TokenStream {
         let struct_fields = self.stub_struct_fields(&stub_struct_name);
-        let methods = methods(&stub_struct_name, associated_remote_methods);
+        let remote_methods_callers =
+            remote_methods_callers(&stub_struct_name, associated_remote_methods);
+        let impl_stub_trait = self.impl_stub_trait(&stub_struct_name);
 
         quote! {
+            #[derive(Clone)]
             pub struct #stub_struct_name {
                 #struct_fields
             }
 
-            #methods
+            #impl_stub_trait
+
+            #remote_methods_callers
         }
     }
 
@@ -49,22 +54,47 @@ impl Service {
             },
         )
     }
-}
 
-fn methods(
-    stub_struct_name: &TokenStream,
-    associated_remote_methods: &[RemoteMethod],
-) -> TokenStream {
-    let methods = associated_remote_methods.iter().map(method);
+    fn impl_stub_trait(&self, stub_struct_name: &TokenStream) -> TokenStream {
+        let field_constructor = self.sub_services.iter().map(
+            |SubService {
+                 pub_keyword: _,
+                 name,
+                 colon,
+                 path,
+             }| {
+                quote! {
+                    #name #colon #path::#stub_struct_name::new()
+                }
+            },
+        );
 
-    quote! {
-        impl #stub_struct_name {
-            #(#methods)*
+        quote! {
+            impl rpc_genie::Stub for #stub_struct_name {
+                fn new() -> Self {
+                    Self {
+                        #(#field_constructor,)*
+                    }
+                }
+            }
         }
     }
 }
 
-fn method(
+fn remote_methods_callers(
+    stub_struct_name: &TokenStream,
+    associated_remote_methods: &[RemoteMethod],
+) -> TokenStream {
+    let associated_remote_methods = associated_remote_methods.iter().map(remote_method_caller);
+
+    quote! {
+        impl #stub_struct_name {
+            #(#associated_remote_methods)*
+        }
+    }
+}
+
+fn remote_method_caller(
     RemoteMethod {
         vis,
         ident,

@@ -80,11 +80,10 @@ fn request_handler_type_definition(
 ) -> TokenStream {
     quote! {
         #[doc(hidden)]
-        pub type #request_handler_struct_name<'state> =
+        pub type #request_handler_struct_name =
             rpc_genie::RequestHandler<
-                'state,
                 #associated_state_struct_name,
-                #associated_sub_service_struct_name<'state>,
+                #associated_sub_service_struct_name,
             >;
     }
 }

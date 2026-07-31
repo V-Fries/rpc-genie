@@ -53,15 +53,20 @@ mod service_b {
     pub struct Client {}
 }
 
-fn main() {
-    let _ = service_a::Server {
+#[tokio::main]
+async fn main() {
+    use std::sync::Arc;
+
+    let _server = service_a::Server {
         server_name: "".to_string(),
-        sub_service_1: service_b::Server { some_state: 1 },
-        sub_service_2: service_b::Server { some_state: 2 },
+        // Here we see that the sub services state are added to the main service state
+        sub_service_1: Arc::new(service_b::Server { some_state: 1 }),
+        sub_service_2: Arc::new(service_b::Server { some_state: 2 }),
     };
 
-    let _ = service_a::Client {
-        sub_service_1: service_b::Client {},
-        sub_service_2: service_b::Client {},
+    let _client = service_a::Client {
+        // Here we see that the sub services state are added to the main service state
+        sub_service_1: Arc::new(service_b::Client {}),
+        sub_service_2: Arc::new(service_b::Client {}),
     };
 }
