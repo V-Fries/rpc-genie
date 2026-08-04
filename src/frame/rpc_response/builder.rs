@@ -1,35 +1,29 @@
 use crate::frame::RpcRequestId;
 
-use super::{RpcError, RpcResponse};
+use super::RpcResponse;
 
 pub struct Uninit;
-type ReturnValueInit = Result<Box<[u8]>, RpcError>;
+type ResponseInit = Result<Box<[u8]>, crate::Error>;
 
-pub struct RpcResponseBuilder<RequestId, ReturnValue> {
+pub struct RpcResponseBuilder<RequestId, Response> {
     id: RequestId,
-    return_value: ReturnValue,
+    response: Response,
 }
 
 impl Default for RpcResponseBuilder<Uninit, Uninit> {
     fn default() -> Self {
         Self {
             id: Uninit,
-            return_value: Uninit,
+            response: Uninit,
         }
     }
 }
 
-impl RpcResponseBuilder<Uninit, Uninit> {
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl RpcResponseBuilder<RpcRequestId, ReturnValueInit> {
+impl RpcResponseBuilder<RpcRequestId, ResponseInit> {
     pub fn build(self) -> RpcResponse {
         RpcResponse {
             id: self.id,
-            return_value: self.return_value,
+            response: self.response,
         }
     }
 }
@@ -42,33 +36,33 @@ impl<RequestId> RpcResponseBuilder<RequestId, Uninit> {
     ///
     /// # Panic
     /// This function will panic if return_value is not serializable using MessagePack
-    pub fn set_return_value(
+    pub fn response(
         self,
-        return_value: &impl serde::Serialize,
-    ) -> RpcResponseBuilder<RequestId, ReturnValueInit> {
+        response: &impl serde::Serialize,
+    ) -> RpcResponseBuilder<RequestId, ResponseInit> {
         RpcResponseBuilder {
             id: self.id,
-            return_value: Ok(rmp_serde::to_vec_named(return_value)
+            response: Ok(rmp_serde::to_vec_named(response)
                 .expect("return value must be serializable in message pack")
                 .into_boxed_slice()),
         }
     }
 
     /// Disable the return value.
-    pub fn set_error(self, error: RpcError) -> RpcResponseBuilder<RequestId, ReturnValueInit> {
+    pub fn error(self, error: crate::Error) -> RpcResponseBuilder<RequestId, ResponseInit> {
         RpcResponseBuilder {
             id: self.id,
-            return_value: Err(error),
+            response: Err(error),
         }
     }
 }
 
-impl<ReturnValue> RpcResponseBuilder<Uninit, ReturnValue> {
+impl<Response> RpcResponseBuilder<Uninit, Response> {
     /// Sets the request id
-    pub fn id(self, id: impl Into<RpcRequestId>) -> RpcResponseBuilder<RpcRequestId, ReturnValue> {
+    pub fn id(self, id: RpcRequestId) -> RpcResponseBuilder<RpcRequestId, Response> {
         RpcResponseBuilder {
-            id: id.into(),
-            return_value: self.return_value,
+            id,
+            response: self.response,
         }
     }
 }

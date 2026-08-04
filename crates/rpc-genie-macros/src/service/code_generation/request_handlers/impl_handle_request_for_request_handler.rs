@@ -18,9 +18,10 @@ pub fn impl_handle_request_for_request_handler(
             async fn handle_request(
                 &self,
                 method_path: &str,
-                __rpc_client__: #opposite_stub_struct_name,
-                mut __rpc_args__: rpc_genie::Args,
-            ) -> rpc_genie::Result<rpc_genie::ReturnValue> {
+                __rpc_stub__: #opposite_stub_struct_name,
+                mut __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
+                __rpc_request_id__: rpc_genie::frame::RpcRequestId,
+            ) -> rpc_genie::frame::rpc_response::RpcResponse {
                 #fn_content
             }
         }
@@ -33,7 +34,12 @@ fn fn_content(
 ) -> TokenStream {
     let sub_services_handle_request_call = quote! {
         self.sub_services
-            .handle_request(method_path, __rpc_client__, __rpc_args__)
+            .handle_request(
+                method_path,
+                __rpc_stub__,
+                __rpc_request_arg_reader__,
+                __rpc_request_id__,
+            )
             .await
     };
 
@@ -64,7 +70,19 @@ fn match_branch(
     let code_that_parses_args_into_vars = remote_method.args.iter().map(|arg| {
         let pat = &arg.pat;
         let ty = &arg.ty;
-        quote!(let #pat = __rpc_args__.read_arg::<#ty>()?;)
+        quote! {
+            let #pat = match __rpc_request_arg_reader__.read_arg::<#ty>() {
+                Ok(arg) => arg,
+                Err(err) => {
+                    return rpc_genie::frame::rpc_response::RpcResponse::builder()
+                        .id(__rpc_request_id__)
+                        .error(rpc_genie::Error::FailedToDeserializeArg {
+                            details: err.to_string(),
+                        })
+                        .build();
+                },
+            };
+        }
     });
 
     let args_names = remote_method.args.iter().map(|arg| {
@@ -82,8 +100,10 @@ fn match_branch(
     quote! {
         #method_name_as_literal_str => {
             #(#code_that_parses_args_into_vars)*
-            let res = #method_caller;
-            Ok(rpc_genie::ReturnValue::new(res))
+            rpc_genie::frame::rpc_response::RpcResponse::builder()
+                .id(__rpc_request_id__)
+                .response(&#method_caller)
+                .build()
         }
     }
 }

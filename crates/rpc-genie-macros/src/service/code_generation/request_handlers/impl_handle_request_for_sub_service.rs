@@ -17,9 +17,10 @@ pub fn impl_handle_request_for_sub_service(
             async fn handle_request(
                 &self,
                 method_path: &str,
-                __rpc_client__: #opposite_stub_struct_name,
-                __rpc_args__: rpc_genie::Args,
-            ) -> rpc_genie::Result<rpc_genie::ReturnValue> {
+                __rpc_stub__: #opposite_stub_struct_name,
+                __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
+                __rpc_request_id__: rpc_genie::frame::RpcRequestId,
+            ) -> rpc_genie::frame::rpc_response::RpcResponse {
                 #fn_content
             }
         }
@@ -27,18 +28,28 @@ pub fn impl_handle_request_for_sub_service(
 }
 
 fn fn_content(sub_services: &[SubService]) -> TokenStream {
-    let not_found_error_ast = quote!(Err(rpc_genie::Error::MethodNotFound));
+    let not_found_error_ast = quote! {
+        rpc_genie::frame::rpc_response::RpcResponse::builder()
+            .id(__rpc_request_id__)
+            .error(rpc_genie::Error::MethodNotFound)
+            .build()
+    };
 
     if sub_services.is_empty() {
         return not_found_error_ast;
     }
     let match_branches = sub_services.iter().map(|remote_method| {
         let name = &remote_method.name;
-        let ident_as_lit_str = ident_to_lit_str(name);
+        let name_as_lit_str = ident_to_lit_str(name);
         quote! {
-            #ident_as_lit_str => {
+            #name_as_lit_str => {
                 self.#name
-                    .handle_request(method_path, __rpc_client__.#name, __rpc_args__)
+                    .handle_request(
+                        method_path,
+                        __rpc_stub__.#name,
+                        __rpc_request_arg_reader__,
+                        __rpc_request_id__,
+                    )
                     .await
             }
         }

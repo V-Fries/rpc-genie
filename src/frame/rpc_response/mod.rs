@@ -1,6 +1,3 @@
-mod error;
-pub use error::{ReturnValueError, RpcError};
-
 mod builder;
 // TODO remove allow unused
 #[allow(unused)]
@@ -11,7 +8,7 @@ use crate::frame::RpcRequestId;
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub struct RpcResponse {
     pub id: RpcRequestId,
-    pub return_value: Result<Box<[u8]>, RpcError>,
+    pub response: Result<Box<[u8]>, crate::Error>,
 }
 
 impl RpcResponse {
@@ -21,7 +18,15 @@ impl RpcResponse {
     }
 
     /// Tries to parse the result value from the response.
-    pub fn get_return_value<T: serde::de::DeserializeOwned>(self) -> Result<T, ReturnValueError> {
-        Ok(rmp_serde::from_slice(&self.return_value?)?)
+    pub fn get_response<T: serde::de::DeserializeOwned>(self) -> Result<T, crate::Error> {
+        rmp_serde::from_slice(&self.response?).map_err(|err| {
+            crate::Error::FailedToDeserializeResponse {
+                details: err.to_string(),
+            }
+        })
+    }
+
+    pub fn builder() -> RpcResponseBuilder<builder::Uninit, builder::Uninit> {
+        RpcResponseBuilder::default()
     }
 }
