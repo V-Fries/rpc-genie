@@ -65,7 +65,8 @@ impl Service {
                                        generics,
                                        fields,
                                        semi_token,
-                                   }: &ItemStruct| {
+                                   }: &ItemStruct,
+                                   trait_to_implement| {
             let fields_iter = fields.iter();
 
             let sub_services_fields = self.sub_services.iter().map(
@@ -74,7 +75,7 @@ impl Service {
                      name,
                      colon,
                      path,
-                 }| quote!(#pub_keyword #name #colon #path::#ident),
+                 }| quote!(#pub_keyword #name #colon std::sync::Arc<#path::#ident>),
             );
 
             quote! {
@@ -91,11 +92,14 @@ impl Service {
                         #sub_services_fields,
                     )*
                 }#semi_token
+
+                impl rpc_genie::State for #ident {}
+                impl #trait_to_implement for #ident {}
             }
         };
 
-        let server_state = create_final_struct(&self.server);
-        let client_state = create_final_struct(&self.client);
+        let server_state = create_final_struct(&self.server, quote!(rpc_genie::Server));
+        let client_state = create_final_struct(&self.client, quote!(rpc_genie::Client));
 
         quote! {
             #server_state
@@ -106,12 +110,6 @@ impl Service {
     /// Creates the ServerSubServices and ClientSubServices structs
     fn sub_services_structs(&self) -> TokenStream {
         let fields_ast_creator = |field_type| {
-            if self.sub_services.is_empty() {
-                // To simplify the code we use empty structs when no sub services are present.
-                // We use the PhantomData to avoid an error due to 'state not being used
-                return quote!(_state_lifetime: std::marker::PhantomData<&'state ()>,);
-            }
-
             self.sub_services.iter().fold(
                 TokenStream::new(),
                 |acc,
@@ -129,17 +127,17 @@ impl Service {
             )
         };
 
-        let server_side_fields = fields_ast_creator(quote!(ServerRequestHandler<'state>));
-        let client_side_fields = fields_ast_creator(quote!(ClientRequestHandler<'state>));
+        let server_side_fields = fields_ast_creator(quote!(ServerRequestHandler));
+        let client_side_fields = fields_ast_creator(quote!(ClientRequestHandler));
 
         quote! {
             #[doc(hidden)]
-            pub struct ServerSubServices<'state> {
+            pub struct ServerSubServices {
                 #server_side_fields
             }
 
             #[doc(hidden)]
-            pub struct ClientSubServices<'state> {
+            pub struct ClientSubServices {
                 #client_side_fields
             }
         }
@@ -149,20 +147,47 @@ impl Service {
 fn as_request_handler_impl_blocks() -> TokenStream {
     fn impl_block_creator(
         state_struct_name: TokenStream,
+        request_handler_struct_name: TokenStream,
         associated_sub_services_struct_name: TokenStream,
+        opposite_stub_struct_name: TokenStream,
     ) -> TokenStream {
         quote! {
-            impl<'state> rpc_genie::AsRequestHandler<
-                'state,
-                #associated_sub_services_struct_name<'state>
-            > for #state_struct_name { }
+            impl rpc_genie::IntoRequestHandler<
+                #request_handler_struct_name,
+                #associated_sub_services_struct_name,
+                #opposite_stub_struct_name,
+            > for #state_struct_name {
+                fn into_request_handler(
+                    self: std::sync::Arc<Self>,
+                    service_path: Option<std::sync::Arc<String>>
+                ) -> #request_handler_struct_name {
+                    use rpc_genie::SubServicesFromState;
+
+                    #request_handler_struct_name {
+                        state: std::sync::Arc::clone(&self),
+                        sub_services: #associated_sub_services_struct_name::from_state(
+                            self,
+                            service_path.as_deref().map(String::as_str),
+                        ),
+                        service_path,
+                    }
+                }
+            }
         }
     }
 
-    let impl_as_request_handler_for_server =
-        impl_block_creator(quote!(Server), quote!(ServerSubServices));
-    let impl_as_request_handler_for_client =
-        impl_block_creator(quote!(Client), quote!(ClientSubServices));
+    let impl_as_request_handler_for_server = impl_block_creator(
+        quote!(Server),
+        quote!(ServerRequestHandler),
+        quote!(ServerSubServices),
+        quote!(ClientStub),
+    );
+    let impl_as_request_handler_for_client = impl_block_creator(
+        quote!(Client),
+        quote!(ClientRequestHandler),
+        quote!(ClientSubServices),
+        quote!(ServerStub),
+    );
 
     quote! {
         #impl_as_request_handler_for_server

@@ -12,8 +12,8 @@ pub fn impl_handle_request_for_request_handler(
     let fn_content = fn_content(associated_state_struct_name, associated_remote_methods);
 
     quote! {
-        impl<'state> rpc_genie::HandleRequest<#opposite_stub_struct_name>
-            for #request_handler_struct_name<'state>
+        impl rpc_genie::HandleRequest<#opposite_stub_struct_name>
+            for #request_handler_struct_name
         {
             async fn handle_request(
                 &self,

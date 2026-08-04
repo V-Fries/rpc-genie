@@ -32,13 +32,12 @@ impl Service {
         sub_service_struct_creation_ast: &TokenStream,
     ) -> TokenStream {
         quote! {
-            impl<'state> rpc_genie::SubServicesFromState<
-                'state,
+            impl rpc_genie::SubServicesFromState<
                 #state_struct_name,
-            > for #associated_sub_services_struct_name<'state>
+            > for #associated_sub_services_struct_name
             {
                 fn from_state(
-                    state: &'state #state_struct_name,
+                    state: std::sync::Arc<#state_struct_name>,
                     service_path: Option<&str>
                 ) -> Self {
                     #sub_service_struct_creation_ast
@@ -51,7 +50,7 @@ impl Service {
         let field_creation_ast = self.sub_service_struct_field_creation_ast();
 
         quote! {
-            use rpc_genie::AsRequestHandler;
+            use rpc_genie::IntoRequestHandler;
 
             Self {
                 #field_creation_ast
@@ -60,12 +59,6 @@ impl Service {
     }
 
     fn sub_service_struct_field_creation_ast(&self) -> TokenStream {
-        if self.sub_services.is_empty() {
-            return quote! {
-                _state_lifetime: std::marker::PhantomData,
-            };
-        }
-
         let field_creation_ast = self.sub_services.iter().map(
             |SubService {
                  pub_keyword: _,
@@ -85,9 +78,8 @@ impl Service {
                         };
 
 
-                        state
-                            .#name
-                            .as_request_handler(Some(std::sync::Arc::new(service_path)))
+                        std::sync::Arc::clone(&state.#name)
+                            .into_request_handler(Some(std::sync::Arc::new(service_path)))
                     }
                 }
             },

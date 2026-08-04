@@ -11,8 +11,8 @@ pub fn impl_handle_request_for_sub_service(
     let fn_content = fn_content(sub_services);
 
     quote! {
-        impl<'state> rpc_genie::HandleRequest<#opposite_stub_struct_name>
-            for #associated_sub_service_struct_name<'state>
+        impl rpc_genie::HandleRequest<#opposite_stub_struct_name>
+            for #associated_sub_service_struct_name
         {
             async fn handle_request(
                 &self,
