@@ -110,11 +110,6 @@ impl Service {
     /// Creates the ServerSubServices and ClientSubServices structs
     fn sub_services_structs(&self) -> TokenStream {
         let fields_ast_creator = |field_type| {
-            if self.sub_services.is_empty() {
-                // To simplify the code we use empty structs when no sub services are present.
-                return quote!();
-            }
-
             self.sub_services.iter().fold(
                 TokenStream::new(),
                 |acc,

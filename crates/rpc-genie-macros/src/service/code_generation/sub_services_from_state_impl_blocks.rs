@@ -59,10 +59,6 @@ impl Service {
     }
 
     fn sub_service_struct_field_creation_ast(&self) -> TokenStream {
-        if self.sub_services.is_empty() {
-            return quote! {};
-        }
-
         let field_creation_ast = self.sub_services.iter().map(
             |SubService {
                  pub_keyword: _,
