@@ -1,9 +1,9 @@
 use crate::frame::RpcRequestId;
 
-use super::RpcResponse;
+use super::{RpcResponse, RpcResponseError};
 
 pub struct Uninit;
-type ResponseInit = Result<Box<[u8]>, crate::Error>;
+pub type ResponseInit = Result<Box<[u8]>, RpcResponseError>;
 
 pub struct RpcResponseBuilder<RequestId, Response> {
     id: RequestId,
@@ -49,7 +49,7 @@ impl<RequestId> RpcResponseBuilder<RequestId, Uninit> {
     }
 
     /// Disable the return value.
-    pub fn error(self, error: crate::Error) -> RpcResponseBuilder<RequestId, ResponseInit> {
+    pub fn error(self, error: RpcResponseError) -> RpcResponseBuilder<RequestId, ResponseInit> {
         RpcResponseBuilder {
             id: self.id,
             response: Err(error),

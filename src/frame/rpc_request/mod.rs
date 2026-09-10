@@ -1,11 +1,7 @@
 mod builder;
-// TODO remove allow unused
-#[allow(unused)]
 pub use builder::{RpcRequestBuilder, Uninit as RpcRequestBuilderUninit};
 
 mod arg_reader;
-// TODO remove allow unused
-#[allow(unused)]
 pub use arg_reader::{ReadParamError, RpcRequestArgReader};
 
 use crate::frame::RpcRequestId;
@@ -14,7 +10,14 @@ use crate::frame::RpcRequestId;
 pub struct RpcRequest {
     pub(crate) method_path: String,
     pub(crate) args: Box<[u8]>,
-    pub(crate) id: RpcRequestId,
+    pub(crate) response_mode: RpcResponseMode,
+}
+
+#[derive(Debug, serde::Deserialize, serde::Serialize, Clone, Copy)]
+#[cfg_attr(test, derive(PartialEq, Eq))]
+pub enum RpcResponseMode {
+    ExpectsResponseWithId(RpcRequestId),
+    NoResponse,
 }
 
 impl RpcRequest {

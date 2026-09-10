@@ -104,8 +104,10 @@ fn remote_method_caller(
     }: &RemoteMethod,
 ) -> TokenStream {
     let output = match output {
-        ReturnType::Default => quote!(-> rpc_genie::Result<()>),
-        ReturnType::Type(arrow, type_ast) => quote!(#arrow rpc_genie::Result<#type_ast>),
+        ReturnType::Default => quote!(-> rpc_genie::SingleRequestSender<()>),
+        ReturnType::Type(arrow, type_ast) => {
+            quote!(#arrow rpc_genie::SingleRequestSender<#type_ast>)
+        }
     };
 
     // TODO remove this once we finish generating the actual fn content (maybe next PR?)

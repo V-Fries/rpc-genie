@@ -28,4 +28,6 @@ pub enum WriteError {
     WriteFrameSize(io::Error),
     #[error("Failed to write frame: {0}")]
     WriteFrame(io::Error),
+    #[error("Failed to flush stream: {0}")]
+    FlushStream(io::Error),
 }

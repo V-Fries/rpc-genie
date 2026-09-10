@@ -1,15 +1,9 @@
 mod error;
-// TODO remove allow dead_code
-#[allow(dead_code)]
 pub use error::{ReadError, WriteError};
 
-// TODO remove allow dead_code
-#[allow(dead_code)]
 pub mod rpc_request;
 use rpc_request::RpcRequest;
 
-// TODO remove allow dead_code
-#[allow(dead_code)]
 pub mod rpc_response;
 use rpc_response::RpcResponse;
 
@@ -23,8 +17,6 @@ use tokio::io::{
     AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _, BufReader, BufWriter,
 };
 
-// TODO remove allow dead_code
-#[allow(dead_code)]
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
 pub enum Frame {
     RpcRequest(RpcRequest),
@@ -32,14 +24,10 @@ pub enum Frame {
 }
 
 impl Frame {
-    /// This function does not automatically flush the stream.
-    ///
     /// # Cancel safety
     /// This method is not cancellation safe. If the method is used as the
     /// event in a [`tokio::select!`] statement and some
-    /// other branch completes first, then some data may be lost.
-    // TODO remove allow dead_code
-    #[allow(dead_code)]
+    /// other branch completes first, then some data may have already been written.
     pub async fn write_frame<const MAX_FRAME_SIZE: usize>(
         self,
         stream: &mut BufWriter<impl AsyncWrite + Unpin>,
@@ -60,15 +48,15 @@ impl Frame {
         stream
             .write_all(&data)
             .await
-            .map_err(WriteError::WriteFrame)
+            .map_err(WriteError::WriteFrame)?;
+
+        stream.flush().await.map_err(WriteError::FlushStream)
     }
 
     /// # Cancel safety
     /// This method is not cancellation safe. If the method is used as the
     /// event in a [`tokio::select!`] statement and some
     /// other branch completes first, then some data may be lost.
-    // TODO remove allow dead_code
-    #[allow(dead_code)]
     pub async fn read_frame<const MAX_FRAME_SIZE: usize>(
         stream: &mut BufReader<impl AsyncRead + Unpin>,
     ) -> Result<Self, ReadError> {

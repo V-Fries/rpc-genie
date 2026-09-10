@@ -1,13 +1,11 @@
-use crate::frame::rpc_request::RpcRequestId;
-
-use super::RpcRequest;
+use super::{RpcRequest, RpcResponseMode};
 
 pub struct Uninit;
 
-pub struct RpcRequestBuilder<RpcRequestId, MethodPath> {
+pub struct RpcRequestBuilder<RpcResponseMode, MethodPath> {
     method_path: MethodPath,
     args: Vec<u8>,
-    request_id: RpcRequestId,
+    response_mode: RpcResponseMode,
 }
 
 impl Default for RpcRequestBuilder<Uninit, Uninit> {
@@ -15,44 +13,48 @@ impl Default for RpcRequestBuilder<Uninit, Uninit> {
         Self {
             method_path: Uninit,
             args: Vec::new(),
-            request_id: Uninit,
+            response_mode: Uninit,
         }
     }
 }
 
-impl RpcRequestBuilder<RpcRequestId, String> {
+impl RpcRequestBuilder<RpcResponseMode, String> {
     pub fn build(self) -> RpcRequest {
         RpcRequest {
             method_path: self.method_path,
             args: self.args.into_boxed_slice(),
-            id: self.request_id,
+            response_mode: self.response_mode,
         }
     }
 }
 
 impl<MethodPath> RpcRequestBuilder<Uninit, MethodPath> {
-    /// Sets the rpc request id to the given id (see [RpcRequestId])
-    pub fn id(self, id: impl Into<RpcRequestId>) -> RpcRequestBuilder<RpcRequestId, MethodPath> {
+    pub fn response_mode(
+        self,
+        response_mode: RpcResponseMode,
+    ) -> RpcRequestBuilder<RpcResponseMode, MethodPath> {
         RpcRequestBuilder {
             method_path: self.method_path,
             args: self.args,
-            request_id: id.into(),
+            response_mode,
         }
     }
 }
 
-impl<RpcRequestId> RpcRequestBuilder<RpcRequestId, Uninit> {
-    /// Setter for the method path
-    pub fn method_path(self, method: impl Into<String>) -> RpcRequestBuilder<RpcRequestId, String> {
+impl<RpcResponseMode> RpcRequestBuilder<RpcResponseMode, Uninit> {
+    pub fn method_path(
+        self,
+        method: impl Into<String>,
+    ) -> RpcRequestBuilder<RpcResponseMode, String> {
         RpcRequestBuilder {
             method_path: method.into(),
             args: self.args,
-            request_id: self.request_id,
+            response_mode: self.response_mode,
         }
     }
 }
 
-impl<RpcRequestId, MethodPath> RpcRequestBuilder<RpcRequestId, MethodPath> {
+impl<RpcResponseMode, MethodPath> RpcRequestBuilder<RpcResponseMode, MethodPath> {
     /// Adds a param that the rpc request function will use.
     ///
     /// # Implementation detail
