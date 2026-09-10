@@ -24,12 +24,10 @@ pub enum Frame {
 }
 
 impl Frame {
-    /// This function does not automatically flush the stream.
-    ///
     /// # Cancel safety
     /// This method is not cancellation safe. If the method is used as the
     /// event in a [`tokio::select!`] statement and some
-    /// other branch completes first, then some data may be lost.
+    /// other branch completes first, then some data may have already been written.
     pub async fn write_frame<const MAX_FRAME_SIZE: usize>(
         self,
         stream: &mut BufWriter<impl AsyncWrite + Unpin>,
@@ -50,7 +48,9 @@ impl Frame {
         stream
             .write_all(&data)
             .await
-            .map_err(WriteError::WriteFrame)
+            .map_err(WriteError::WriteFrame)?;
+
+        stream.flush().await.map_err(WriteError::FlushStream)
     }
 
     /// # Cancel safety
