@@ -5,7 +5,10 @@ use std::sync::Arc;
 
 pub use rpc_genie_macros::service;
 
-use crate::frame::{RpcRequestId, rpc_request::RpcRequestArgReader, rpc_response::RpcResponse};
+use crate::frame::{
+    rpc_request::RpcRequestArgReader,
+    rpc_response::{self, RpcResponseBuilder},
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum CallError {
@@ -41,8 +44,12 @@ pub trait HandleRequest<Stub>: Send {
         method_path: &str,
         __rpc_stub__: Stub,
         __rpc_request_arg_reader__: RpcRequestArgReader,
-        __rpc_request_id__: RpcRequestId,
-    ) -> impl Future<Output = RpcResponse> + Send;
+    ) -> impl Future<
+        Output = RpcResponseBuilder<
+            rpc_response::builder::Uninit,
+            rpc_response::builder::ResponseInit,
+        >,
+    > + Send;
 }
 
 #[doc(hidden)]

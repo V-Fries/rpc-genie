@@ -20,8 +20,10 @@ pub fn impl_handle_request_for_request_handler(
                 method_path: &str,
                 __rpc_stub__: #opposite_stub_struct_name,
                 mut __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
-                __rpc_request_id__: rpc_genie::frame::RpcRequestId,
-            ) -> rpc_genie::frame::rpc_response::RpcResponse {
+            ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
+                rpc_genie::frame::rpc_response::builder::Uninit,
+                rpc_genie::frame::rpc_response::builder::ResponseInit,
+            > {
                 #fn_content
             }
         }
@@ -38,7 +40,6 @@ fn fn_content(
                 method_path,
                 __rpc_stub__,
                 __rpc_request_arg_reader__,
-                __rpc_request_id__,
             )
             .await
     };
@@ -74,12 +75,11 @@ fn match_branch(
             let #pat = match __rpc_request_arg_reader__.read_arg::<#ty>() {
                 Ok(arg) => arg,
                 Err(err) => {
-                    return rpc_genie::frame::rpc_response::RpcResponse::builder()
-                        .id(__rpc_request_id__)
-                        .error(rpc_genie::Error::FailedToDeserializeArg {
+                    return rpc_genie::frame::rpc_response::RpcResponse::builder().error(
+                        rpc_genie::frame::rpc_response::RpcResponseError::FailedToDeserializeArg {
                             details: err.to_string(),
-                        })
-                        .build();
+                        },
+                    );
                 },
             };
         }
@@ -100,10 +100,7 @@ fn match_branch(
     quote! {
         #method_name_as_literal_str => {
             #(#code_that_parses_args_into_vars)*
-            rpc_genie::frame::rpc_response::RpcResponse::builder()
-                .id(__rpc_request_id__)
-                .response(&#method_caller)
-                .build()
+            rpc_genie::frame::rpc_response::RpcResponse::builder().response(&#method_caller)
         }
     }
 }

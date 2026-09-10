@@ -19,8 +19,10 @@ pub fn impl_handle_request_for_sub_service(
                 method_path: &str,
                 __rpc_stub__: #opposite_stub_struct_name,
                 __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
-                __rpc_request_id__: rpc_genie::frame::RpcRequestId,
-            ) -> rpc_genie::frame::rpc_response::RpcResponse {
+            ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
+                rpc_genie::frame::rpc_response::builder::Uninit,
+                rpc_genie::frame::rpc_response::builder::ResponseInit,
+            > {
                 #fn_content
             }
         }
@@ -30,9 +32,7 @@ pub fn impl_handle_request_for_sub_service(
 fn fn_content(sub_services: &[SubService]) -> TokenStream {
     let not_found_error_ast = quote! {
         rpc_genie::frame::rpc_response::RpcResponse::builder()
-            .id(__rpc_request_id__)
-            .error(rpc_genie::Error::MethodNotFound)
-            .build()
+            .error(rpc_genie::frame::rpc_response::RpcResponseError::MethodNotFound)
     };
 
     if sub_services.is_empty() {
@@ -48,7 +48,6 @@ fn fn_content(sub_services: &[SubService]) -> TokenStream {
                         method_path,
                         __rpc_stub__.#name,
                         __rpc_request_arg_reader__,
-                        __rpc_request_id__,
                     )
                     .await
             }
