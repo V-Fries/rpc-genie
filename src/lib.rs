@@ -1,3 +1,6 @@
+mod single_request_sender;
+pub use single_request_sender::SingleRequestSender;
+
 #[doc(hidden)]
 pub mod frame;
 
