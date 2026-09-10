@@ -7,9 +7,10 @@ pub use rpc_genie_macros::service;
 
 use crate::frame::{RpcRequestId, rpc_request::RpcRequestArgReader, rpc_response::RpcResponse};
 
-#[derive(serde::Deserialize, serde::Serialize, Debug, thiserror::Error)]
-#[cfg_attr(test, derive(PartialEq, Eq))]
-pub enum Error {
+#[derive(Debug, thiserror::Error)]
+pub enum CallError {
+    #[error("Failed to write frame: {0}")]
+    FailedToWriteFrame(frame::WriteError),
     #[error("Method not found")]
     MethodNotFound,
     #[error("Failed to deserialize args: {details}")]
@@ -18,7 +19,11 @@ pub enum Error {
     FailedToDeserializeResponse { details: String },
 }
 
-pub type Result<T, E = Error> = core::result::Result<T, E>;
+#[derive(Debug, thiserror::Error)]
+pub enum NotifyError {
+    #[error("Failed to write frame: {0}")]
+    FailedToWriteFrame(frame::WriteError),
+}
 
 #[doc(hidden)]
 #[allow(dead_code)] // TODO remove allow dead_code
