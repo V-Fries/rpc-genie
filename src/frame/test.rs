@@ -1,5 +1,6 @@
-use tokio::io::{BufReader, BufWriter, DuplexStream};
+use tokio::io::DuplexStream;
 
+use super::rpc_request::{RpcRequestArgReader, RpcResponseMode};
 use super::*;
 
 const MAX_FRAME_SIZE: usize = 1024;
@@ -17,7 +18,6 @@ fn create_duplex_buf_stream() -> (BufWriter<DuplexStream>, BufReader<DuplexStrea
 
 mod rpc_request {
     use super::*;
-    use crate::frame::rpc_request::RpcRequestArgReader;
 
     #[tokio::test]
     async fn method_with_params() {
@@ -25,7 +25,7 @@ mod rpc_request {
 
         let rpc_request = RpcRequest::builder()
             .method_path("method_path")
-            .id(0)
+            .response_mode(RpcResponseMode::ExpectsResponseWithId(0.into()))
             .add_param(&42u32)
             .add_param(&Foo {
                 i: 42,
@@ -37,7 +37,6 @@ mod rpc_request {
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-        stream_1.flush().await.unwrap();
 
         let rpc_request = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
             .await
@@ -47,9 +46,11 @@ mod rpc_request {
             _ => panic!("Received unexpected frame"),
         };
         let mut rpc_request_reader = RpcRequestArgReader::from(rpc_request.args);
-
         assert_eq!("method_path", rpc_request.method_path);
-        assert_eq!(rpc_request.id, 0);
+        assert_eq!(
+            RpcResponseMode::ExpectsResponseWithId(0.into()),
+            rpc_request.response_mode
+        );
         assert_eq!(42u32, rpc_request_reader.read_arg().unwrap());
         assert_eq!(
             Foo {
@@ -67,13 +68,12 @@ mod rpc_request {
 
         let rpc_request = RpcRequest::builder()
             .method_path("method_path")
-            .id(1)
+            .response_mode(RpcResponseMode::ExpectsResponseWithId(1.into()))
             .build();
         Frame::RpcRequest(rpc_request)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-        stream_1.flush().await.unwrap();
 
         let rpc_request = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
             .await
@@ -82,9 +82,11 @@ mod rpc_request {
             Frame::RpcRequest(rpc_request) => rpc_request,
             _ => panic!("Received unexpected frame"),
         };
-
         assert_eq!("method_path", rpc_request.method_path);
-        assert_eq!(rpc_request.id, 1);
+        assert_eq!(
+            RpcResponseMode::ExpectsResponseWithId(1.into()),
+            rpc_request.response_mode
+        );
     }
 
     #[tokio::test]
@@ -93,7 +95,7 @@ mod rpc_request {
 
         let rpc_request = RpcRequest::builder()
             .method_path("method_path")
-            .id(1)
+            .response_mode(RpcResponseMode::NoResponse)
             .add_param(&42u32)
             .add_param(&546u128)
             .add_param(&"string")
@@ -105,14 +107,12 @@ mod rpc_request {
 
         let rpc_request = RpcRequest::builder()
             .method_path("method_path")
-            .id(2)
+            .response_mode(RpcResponseMode::ExpectsResponseWithId(1.into()))
             .build();
         Frame::RpcRequest(rpc_request)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-
-        stream_1.flush().await.unwrap();
 
         let rpc_request_1 = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
             .await
@@ -132,17 +132,21 @@ mod rpc_request {
         };
 
         assert_eq!("method_path", rpc_request_1.method_path);
-        assert_eq!(rpc_request_1.id, 1);
+        assert_eq!(RpcResponseMode::NoResponse, rpc_request_1.response_mode);
         assert_eq!(42u32, rpc_request_reader_1.read_arg().unwrap());
         assert_eq!(546u128, rpc_request_reader_1.read_arg().unwrap());
         assert_eq!("string", rpc_request_reader_1.read_arg::<String>().unwrap());
-
         assert_eq!("method_path", rpc_request_2.method_path);
-        assert_eq!(rpc_request_2.id, 2);
+        assert_eq!(
+            RpcResponseMode::ExpectsResponseWithId(1.into()),
+            rpc_request_2.response_mode
+        );
     }
 }
 
 mod rpc_response {
+    use crate::frame::rpc_response::RpcResponseError;
+
     use super::*;
 
     #[tokio::test]
@@ -154,14 +158,13 @@ mod rpc_response {
             str: "test".to_owned(),
         };
         let response = RpcResponse::builder()
-            .id(RpcRequestId(0))
+            .id(0.into())
             .response(&return_value)
             .build();
         Frame::RpcResponse(response)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-        stream_1.flush().await.unwrap();
 
         let rpc_response = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
             .await
@@ -179,15 +182,11 @@ mod rpc_response {
     async fn response_without_return_value() {
         let (mut stream_1, mut stream_2) = create_duplex_buf_stream();
 
-        let response = RpcResponse::builder()
-            .id(RpcRequestId(1))
-            .response(&())
-            .build();
+        let response = RpcResponse::builder().id(1.into()).response(&()).build();
         Frame::RpcResponse(response)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-        stream_1.flush().await.unwrap();
 
         let rpc_response = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
             .await
@@ -206,7 +205,7 @@ mod rpc_response {
         let (mut stream_1, mut stream_2) = create_duplex_buf_stream();
 
         let response = RpcResponse::builder()
-            .id(RpcRequestId(0))
+            .id(0.into())
             .response(&"test")
             .build();
         Frame::RpcResponse(response)
@@ -214,16 +213,11 @@ mod rpc_response {
             .await
             .unwrap();
 
-        let response = RpcResponse::builder()
-            .id(RpcRequestId(1))
-            .response(&())
-            .build();
+        let response = RpcResponse::builder().id(1.into()).response(&()).build();
         Frame::RpcResponse(response)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-
-        stream_1.flush().await.unwrap();
 
         let rpc_response_1: RpcResponse = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
             .await
@@ -253,15 +247,13 @@ mod rpc_response {
         let (mut stream_1, mut stream_2) = create_duplex_buf_stream();
 
         let response = RpcResponse::builder()
-            .id(RpcRequestId(1))
-            .error(crate::Error::MethodNotFound)
+            .id(1.into())
+            .error(RpcResponseError::MethodNotFound)
             .build();
         Frame::RpcResponse(response)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-
-        stream_1.flush().await.unwrap();
 
         let rpc_response: RpcResponse = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
             .await
@@ -273,7 +265,7 @@ mod rpc_response {
 
         assert_eq!(rpc_response.id(), 1);
         assert_eq!(
-            crate::Error::MethodNotFound,
+            RpcResponseError::MethodNotFound,
             rpc_response.get_response::<()>().unwrap_err()
         );
     }
@@ -287,7 +279,7 @@ mod max_size_check {
         let (mut stream_1, _stream_2) = create_duplex_buf_stream();
 
         let request = RpcRequest::builder()
-            .id(0)
+            .response_mode(RpcResponseMode::ExpectsResponseWithId(0.into()))
             .method_path("test")
             .add_param(&42)
             .build();
@@ -306,7 +298,7 @@ mod max_size_check {
         let (mut stream_1, mut stream_2) = create_duplex_buf_stream();
 
         let request = RpcRequest::builder()
-            .id(0)
+            .response_mode(RpcResponseMode::ExpectsResponseWithId(0.into()))
             .method_path("test")
             .add_param(&42)
             .build();
@@ -314,7 +306,6 @@ mod max_size_check {
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-        stream_1.flush().await.unwrap();
 
         match Frame::read_frame::<3>(&mut stream_2).await.unwrap_err() {
             ReadError::FrameTooBig { size: _, max_size } => assert_eq!(max_size, 3),
@@ -327,7 +318,7 @@ mod max_size_check {
         let (mut stream_1, _stream_2) = create_duplex_buf_stream();
 
         let response = RpcResponse::builder()
-            .id(RpcRequestId(0))
+            .id(0.into())
             .response(&"test")
             .build();
         match Frame::RpcResponse(response)
@@ -345,14 +336,13 @@ mod max_size_check {
         let (mut stream_1, mut stream_2) = create_duplex_buf_stream();
 
         let response = RpcResponse::builder()
-            .id(RpcRequestId(0))
+            .id(0.into())
             .response(&"test")
             .build();
         Frame::RpcResponse(response)
             .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
             .await
             .unwrap();
-        stream_1.flush().await.unwrap();
 
         match Frame::read_frame::<3>(&mut stream_2).await.unwrap_err() {
             ReadError::FrameTooBig { size: _, max_size } => assert_eq!(max_size, 3),
