@@ -2,6 +2,9 @@ mod single_request_sender;
 pub use single_request_sender::SingleRequestSender;
 
 #[doc(hidden)]
+pub mod send_request;
+
+#[doc(hidden)]
 pub mod frame;
 
 use std::sync::Arc;
@@ -76,8 +79,10 @@ pub trait Client: State {}
 pub trait Server: State {}
 
 #[doc(hidden)]
-pub trait Stub: Clone + Send {
-    // TODO This prototype will be replaced in the future. We just need a way to create a stub so
-    // we can continue working on other parts of the code
-    fn new() -> Self;
+pub trait Stub<RequestSender>
+where
+    Self: Clone + Send + 'static + Sync,
+    RequestSender: send_request::SendRequest,
+{
+    fn new(request_sender: RequestSender) -> Self;
 }
