@@ -77,9 +77,8 @@ impl Service {
                             None => #str_to_add_to_service_path.to_owned(),
                         };
 
-
                         std::sync::Arc::clone(&state.#name)
-                            .into_request_handler(Some(std::sync::Arc::new(service_path)))
+                            .into_request_handler(Some(service_path))
                     }
                 }
             },

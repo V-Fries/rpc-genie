@@ -40,7 +40,7 @@ impl Service {
         let sub_services_structs = self.sub_services_structs();
         let request_handlers = self.request_handlers();
         let stubs = self.stubs();
-        let as_request_handler_impl_blocks = as_request_handler_impl_blocks();
+        let into_request_handler_impl_blocks = into_request_handler_impl_blocks();
         let sub_services_from_state_impl_blocks = self.sub_services_from_state_impl_blocks();
         let rest = &self.rest;
 
@@ -49,7 +49,7 @@ impl Service {
             #sub_services_structs
             #request_handlers
             #stubs
-            #as_request_handler_impl_blocks
+            #into_request_handler_impl_blocks
             #sub_services_from_state_impl_blocks
             #(#rest)*
         }
@@ -121,7 +121,7 @@ impl Service {
                  }| {
                     quote! {
                         #acc
-                        #pub_keyword #name #colon #path::#field_type,
+                        #pub_keyword #name #colon std::sync::Arc<#path::#field_type>,
                     }
                 },
             )
@@ -144,33 +144,31 @@ impl Service {
     }
 }
 
-fn as_request_handler_impl_blocks() -> TokenStream {
+fn into_request_handler_impl_blocks() -> TokenStream {
     fn impl_block_creator(
         state_struct_name: TokenStream,
         request_handler_struct_name: TokenStream,
         associated_sub_services_struct_name: TokenStream,
-        opposite_stub_struct_name: TokenStream,
     ) -> TokenStream {
         quote! {
             impl rpc_genie::IntoRequestHandler<
                 #request_handler_struct_name,
                 #associated_sub_services_struct_name,
-                #opposite_stub_struct_name,
             > for #state_struct_name {
                 fn into_request_handler(
                     self: std::sync::Arc<Self>,
-                    service_path: Option<std::sync::Arc<String>>
-                ) -> #request_handler_struct_name {
+                    service_path: Option<String>
+                ) -> std::sync::Arc<#request_handler_struct_name> {
                     use rpc_genie::SubServicesFromState;
 
-                    #request_handler_struct_name {
+                    std::sync::Arc::new(#request_handler_struct_name {
                         state: std::sync::Arc::clone(&self),
                         sub_services: #associated_sub_services_struct_name::from_state(
                             self,
-                            service_path.as_deref().map(String::as_str),
+                            service_path.as_deref(),
                         ),
                         service_path,
-                    }
+                    })
                 }
             }
         }
@@ -180,13 +178,11 @@ fn as_request_handler_impl_blocks() -> TokenStream {
         quote!(Server),
         quote!(ServerRequestHandler),
         quote!(ServerSubServices),
-        quote!(ClientStub),
     );
     let impl_as_request_handler_for_client = impl_block_creator(
         quote!(Client),
         quote!(ClientRequestHandler),
         quote!(ClientSubServices),
-        quote!(ServerStub),
     );
 
     quote! {

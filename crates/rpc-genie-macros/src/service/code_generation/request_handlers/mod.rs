@@ -47,7 +47,7 @@ fn request_handler(
     opposite_stub_struct_name: TokenStream,
     sub_services: &[SubService],
 ) -> TokenStream {
-    let request_handler_type_definition = request_handler_type_definition(
+    let request_handler_struct_definition = request_handler_struct_definition(
         &request_handler_struct_name,
         &associated_state_struct_name,
         &associated_sub_service_struct_name,
@@ -67,23 +67,23 @@ fn request_handler(
     );
 
     quote! {
-        #request_handler_type_definition
+        #request_handler_struct_definition
         #impl_handle_request_for_request_handler
         #impl_handle_request_for_sub_service
     }
 }
 
-fn request_handler_type_definition(
+fn request_handler_struct_definition(
     request_handler_struct_name: &TokenStream,
     associated_state_struct_name: &TokenStream,
     associated_sub_service_struct_name: &TokenStream,
 ) -> TokenStream {
     quote! {
         #[doc(hidden)]
-        pub type #request_handler_struct_name =
-            rpc_genie::RequestHandler<
-                #associated_state_struct_name,
-                #associated_sub_service_struct_name,
-            >;
+        pub struct #request_handler_struct_name {
+            pub service_path: Option<String>,
+            pub state: std::sync::Arc<#associated_state_struct_name>,
+            pub sub_services: #associated_sub_service_struct_name,
+        }
     }
 }
