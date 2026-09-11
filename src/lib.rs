@@ -32,14 +32,6 @@ pub enum NotifyError {
 }
 
 #[doc(hidden)]
-#[allow(dead_code)] // TODO remove allow dead_code
-pub struct RequestHandler<State, SubServices> {
-    pub service_path: Option<Arc<String>>,
-    pub state: Arc<State>,
-    pub sub_services: SubServices,
-}
-
-#[doc(hidden)]
 #[allow(async_fn_in_trait)]
 pub trait HandleRequest<Stub>: Send {
     fn handle_request(
@@ -56,12 +48,11 @@ pub trait HandleRequest<Stub>: Send {
 }
 
 #[doc(hidden)]
-pub trait IntoRequestHandler<RequestHandler, SubServices: SubServicesFromState<Self>, Stub>
+pub trait IntoRequestHandler<RequestHandler, SubServices: SubServicesFromState<Self>>
 where
     Self: Sized,
-    RequestHandler: HandleRequest<Stub>,
 {
-    fn into_request_handler(self: Arc<Self>, service_path: Option<Arc<String>>) -> RequestHandler;
+    fn into_request_handler(self: Arc<Self>, service_path: Option<String>) -> Arc<RequestHandler>;
 }
 
 #[doc(hidden)]
