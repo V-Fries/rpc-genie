@@ -27,7 +27,8 @@ impl Service {
 
         quote! {
             #[derive(Clone)]
-            pub struct #stub_struct_name {
+            pub struct #stub_struct_name<RequestSender> {
+                __rpc_genie_request_sender__: RequestSender,
                 #struct_fields
             }
 
@@ -49,7 +50,7 @@ impl Service {
              }| {
                 quote! {
                     #acc
-                    #pub_keyword #name #colon #path::#stub_struct_name,
+                    #pub_keyword #name #colon #path::#stub_struct_name<RequestSender>,
                 }
             },
         )
@@ -64,16 +65,20 @@ impl Service {
                  path,
              }| {
                 quote! {
-                    #name #colon #path::#stub_struct_name::new()
+                    #name #colon #path::#stub_struct_name::<RequestSender>::new(request_sender.clone())
                 }
             },
         );
 
         quote! {
-            impl rpc_genie::Stub for #stub_struct_name {
-                fn new() -> Self {
+            impl<RequestSender> rpc_genie::Stub<RequestSender> for #stub_struct_name<RequestSender>
+            where
+                RequestSender: rpc_genie::send_request::SendRequest,
+            {
+                fn new(request_sender: RequestSender) -> Self {
                     Self {
                         #(#field_constructor,)*
+                        __rpc_genie_request_sender__: request_sender,
                     }
                 }
             }
@@ -88,7 +93,10 @@ fn remote_methods_callers(
     let associated_remote_methods = associated_remote_methods.iter().map(remote_method_caller);
 
     quote! {
-        impl #stub_struct_name {
+        impl<RequestSender> #stub_struct_name<RequestSender>
+        where
+            RequestSender: rpc_genie::send_request::SendRequest,
+        {
             #(#associated_remote_methods)*
         }
     }

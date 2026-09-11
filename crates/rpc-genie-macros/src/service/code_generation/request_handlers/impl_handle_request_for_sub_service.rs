@@ -11,13 +11,13 @@ pub fn impl_handle_request_for_sub_service(
     let fn_content = fn_content(sub_services);
 
     quote! {
-        impl rpc_genie::HandleRequest<#opposite_stub_struct_name>
+        impl<RequestSender: rpc_genie::send_request::SendRequest> rpc_genie::HandleRequest<#opposite_stub_struct_name<RequestSender>>
             for #associated_sub_service_struct_name
         {
             async fn handle_request(
                 &self,
                 method_path: &str,
-                __rpc_stub__: #opposite_stub_struct_name,
+                __rpc_stub__: #opposite_stub_struct_name<RequestSender>,
                 __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
             ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
                 rpc_genie::frame::rpc_response::builder::Uninit,

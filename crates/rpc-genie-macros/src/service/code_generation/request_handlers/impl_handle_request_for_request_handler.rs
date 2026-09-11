@@ -12,13 +12,14 @@ pub fn impl_handle_request_for_request_handler(
     let fn_content = fn_content(associated_state_struct_name, associated_remote_methods);
 
     quote! {
-        impl rpc_genie::HandleRequest<#opposite_stub_struct_name>
+        impl<RequestSender: rpc_genie::send_request::SendRequest>
+            rpc_genie::HandleRequest<#opposite_stub_struct_name<RequestSender>>
             for #request_handler_struct_name
         {
             async fn handle_request(
                 &self,
                 method_path: &str,
-                __rpc_stub__: #opposite_stub_struct_name,
+                __rpc_stub__: #opposite_stub_struct_name<RequestSender>,
                 mut __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
             ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
                 rpc_genie::frame::rpc_response::builder::Uninit,
