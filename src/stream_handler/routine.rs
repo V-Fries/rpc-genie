@@ -48,6 +48,9 @@ where
         tokio::select! {
             _ = kill_routine_receiver.recv() => {}
 
+            // frame_handler_loop() is not cancel safe, but it doesn't matter as the only thing
+            // canceling it corrupts is the stream which we won't use anymore anyway if we kill the
+            // routine
             _ = self.frame_handler_loop(
                 BufReader::new(read_stream),
                 buf_writer,
