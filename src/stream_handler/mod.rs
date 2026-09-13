@@ -32,6 +32,8 @@ mod test;
 /// This method is not cancellation safe. If the method is used as the
 /// event in a [`tokio::select!`] statement and some
 /// other branch completes first, then some data may be lost.
+// TODO remove allow dead_code
+#[allow(dead_code)]
 pub async fn start_routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, Stub>(
     stream: Stream,
     stream_id: StreamId,

@@ -1,6 +1,8 @@
 mod single_request_sender;
 pub use single_request_sender::SingleRequestSender;
 
+mod stream_handler;
+
 #[doc(hidden)]
 pub mod send_request;
 
@@ -18,6 +20,8 @@ use crate::frame::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum CallError {
+    #[error("Stream handler routine is stopped: {0}")]
+    RoutineIsStopped(stream_handler::StopReason),
     #[error("Failed to write frame: {0}")]
     FailedToWriteFrame(frame::WriteError),
     #[error("Method not found")]
@@ -30,13 +34,15 @@ pub enum CallError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum NotifyError {
+    #[error("Stream handler routine is stopped: {0}")]
+    RoutineIsStopped(stream_handler::StopReason),
     #[error("Failed to write frame: {0}")]
     FailedToWriteFrame(frame::WriteError),
 }
 
 #[doc(hidden)]
 #[allow(async_fn_in_trait)]
-pub trait HandleRequest<Stub>: Send {
+pub trait HandleRequest<Stub>: Sync + Send + 'static {
     fn handle_request(
         &self,
         method_path: &str,
