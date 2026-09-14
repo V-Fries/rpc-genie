@@ -58,7 +58,7 @@ impl RegisteredTopics {
         stub_died_notification_sender: topic::StubDiedNotificationSender,
     ) {
         match self.positions.entry(topic_id) {
-            hash_map::Entry::Occupied(_) => {},
+            hash_map::Entry::Occupied(_) => {}
             hash_map::Entry::Vacant(entry) => {
                 entry.insert(self.topics.len());
 
