@@ -112,6 +112,6 @@ pub trait SubscribableStub: Sized {
 
     fn remove_registered_topic(&self, topic_id: topic::TopicId);
 
-    /// Returns None if the stub is already dead, Some(stream_id) otherwise
+    /// Returns None if the stream identity is unavailable, Some(stream_id) otherwise
     fn stream_id(&self) -> Option<StreamId>;
 }
