@@ -6,7 +6,7 @@ mod routine;
 use routine::Routine;
 
 mod stream_id;
-use stream_id::StreamId;
+pub use stream_id::StreamId;
 
 use std::marker::PhantomData;
 use std::sync::Weak;
