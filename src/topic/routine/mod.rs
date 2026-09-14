@@ -49,8 +49,8 @@ where
         RoutineCommandSender<Stub>,
         Arc<RwLock<SubscribedStubs<Stub>>>,
     ) {
-        static NEXT_SUBSCRIBED_STUBS_ID: AtomicU64 = AtomicU64::new(0);
-        let id = TopicId(NEXT_SUBSCRIBED_STUBS_ID.fetch_add(1, atomic::Ordering::Relaxed));
+        static NEXT_TOPIC_ID: AtomicU64 = AtomicU64::new(0);
+        let id = TopicId(NEXT_TOPIC_ID.fetch_add(1, atomic::Ordering::Relaxed));
 
         let subscribed_stubs = Arc::new(RwLock::new(SubscribedStubs::new(id)));
 
