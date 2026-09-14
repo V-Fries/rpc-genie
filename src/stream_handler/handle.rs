@@ -116,10 +116,7 @@ impl<const MAX_FRAME_SIZE: usize, Stream> Handle<MAX_FRAME_SIZE, Stream> {
     }
 
     pub(super) async fn stop_with(&self, stop_reason: StopReason) {
-        let mut lock = self.state.lock().await;
-
-        lock.stop_with(stop_reason).await;
-
+        self.state.lock().await.stop_with(stop_reason).await;
         self.send_death_notifications();
     }
 
