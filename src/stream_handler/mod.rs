@@ -34,7 +34,7 @@ mod test;
 /// other branch completes first, then some data may be lost.
 // TODO remove allow dead_code
 #[allow(dead_code)]
-pub(crate) async fn start_routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, Stub>(
+pub(crate) async fn spawn_routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, Stub>(
     stream: Stream,
     stream_id: StreamId,
     request_handler: Arc<RequestHandler>,

@@ -12,7 +12,7 @@ use crate::{
     send_request::SendRequest,
 };
 
-use super::{StopReason, StreamId, start_routine};
+use super::{StopReason, StreamId, spawn_routine};
 
 const MAX_FRAME_SIZE: usize = 1024;
 
@@ -59,7 +59,7 @@ async fn start_test_routine() -> (
 ) {
     let (server_stream, client_stream) = tokio::io::duplex(4096);
 
-    let handle = start_routine::<MAX_FRAME_SIZE, _, _, TestStub>(
+    let handle = spawn_routine::<MAX_FRAME_SIZE, _, _, TestStub>(
         server_stream,
         StreamId::next(),
         Arc::new(TestHandler),
