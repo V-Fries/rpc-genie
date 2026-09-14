@@ -57,19 +57,17 @@ impl RegisteredTopics {
         topic_id: TopicId,
         stub_died_notification_sender: topic::StubDiedNotificationSender,
     ) {
-        let next_index = self.topics.len();
-
         match self.positions.entry(topic_id) {
-            hash_map::Entry::Occupied(_) => return,
+            hash_map::Entry::Occupied(_) => {},
             hash_map::Entry::Vacant(entry) => {
-                entry.insert(next_index);
+                entry.insert(self.topics.len());
+
+                self.topics.push(RegisteredTopic {
+                    id: topic_id,
+                    stub_died_notification_sender,
+                });
             }
         }
-
-        self.topics.push(RegisteredTopic {
-            id: topic_id,
-            stub_died_notification_sender,
-        });
     }
 
     fn remove(&mut self, topic_id: TopicId) {
