@@ -211,3 +211,129 @@ async fn dropping_topic_unregisters_remaining_stubs() {
     wait_until_registration_count(&first, 0).await;
     wait_until_registration_count(&second, 0).await;
 }
+
+#[derive(Clone)]
+struct NoStreamIdStub;
+
+impl SubscribableStub for NoStreamIdStub {
+    async fn add_registered_topic(
+        &self,
+        _topic_id: crate::topic::TopicId,
+        _stub_died_notification_sender: StubDiedNotificationSender,
+    ) -> bool {
+        true
+    }
+
+    fn remove_registered_topic(&self, _topic_id: crate::topic::TopicId) {}
+
+    fn stream_id(&self) -> Option<StreamId> {
+        None
+    }
+}
+
+#[tokio::test]
+async fn subscribe_stub_with_no_stream_id_is_noop() {
+    let topic = Topic::new().await;
+
+    topic.subscribe(NoStreamIdStub).await;
+
+    assert!(topic.map(|_| async {}).await.is_empty());
+}
+
+#[tokio::test]
+async fn unsubscribe_nonexistent_stream_id_is_noop() {
+    let topic: Topic<TestStub> = Topic::new().await;
+    let fake_id = StreamId::next();
+
+    topic.unsubscribe(fake_id).await;
+
+    assert!(topic.map(|_| async {}).await.is_empty());
+}
+
+#[tokio::test]
+async fn stub_subscribed_to_multiple_topics_dies_removes_from_all() {
+    let topic_a = Topic::new().await;
+    let topic_b = Topic::new().await;
+    let stub = TestStub::new();
+
+    topic_a.subscribe(stub.clone()).await;
+    topic_b.subscribe(stub.clone()).await;
+    assert_eq!(stub.registered_topic_count(), 2);
+
+    stub.die();
+    wait_until_empty(&topic_a).await;
+    wait_until_empty(&topic_b).await;
+    assert_eq!(stub.registered_topic_count(), 0);
+}
+
+#[tokio::test]
+async fn unsubscribe_then_resubscribe_same_stub() {
+    let topic = Topic::new().await;
+    let stub = TestStub::new();
+    let stream_id = stub.stream_id();
+
+    topic.subscribe(stub.clone()).await;
+    assert_eq!(topic.map(|_| async {}).await.len(), 1);
+
+    topic.unsubscribe(stream_id).await;
+    assert!(topic.map(|_| async {}).await.is_empty());
+    assert_eq!(stub.registered_topic_count(), 0);
+
+    topic.subscribe(stub.clone()).await;
+    assert_eq!(topic.map(|_| async {}).await.len(), 1);
+    assert_eq!(stub.registered_topic_count(), 1);
+}
+
+#[tokio::test]
+async fn map_and_for_each_on_empty_topic() {
+    let topic: Topic<TestStub> = Topic::new().await;
+
+    let ids = topic.map(|stub| async move { stub.stream_id() }).await;
+    assert!(ids.is_empty());
+
+    let visited = Arc::new(Mutex::new(false));
+    let visited_clone = Arc::clone(&visited);
+    topic
+        .for_each(move |_stub| {
+            let visited = Arc::clone(&visited_clone);
+            async move {
+                *visited.lock().unwrap() = true;
+            }
+        })
+        .await;
+
+    assert!(!*visited.lock().unwrap());
+}
+
+#[tokio::test]
+async fn concurrent_subscribes() {
+    let topic = Topic::new().await;
+    let stubs: Vec<TestStub> = (0..10).map(|_| TestStub::new()).collect();
+
+    let mut handles = Vec::new();
+    for stub in &stubs {
+        let topic_clone = Topic {
+            subscribed_stubs: Arc::clone(&topic.subscribed_stubs),
+            routine_command_sender: topic.routine_command_sender.clone(),
+        };
+        let stub_clone = stub.clone();
+        handles.push(tokio::spawn(async move {
+            topic_clone.subscribe(stub_clone).await;
+        }));
+    }
+
+    for handle in handles {
+        handle.await.unwrap();
+    }
+
+    let mut ids = topic.map(|stub| async move { stub.stream_id() }).await;
+    ids.sort_by_key(|id| id.to_string());
+
+    let mut expected: Vec<StreamId> = stubs.iter().map(|s| s.stream_id()).collect();
+    expected.sort_by_key(|id| id.to_string());
+    assert_eq!(ids, expected);
+
+    for stub in &stubs {
+        assert_eq!(stub.registered_topic_count(), 1);
+    }
+}
