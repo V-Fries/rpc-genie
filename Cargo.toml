@@ -5,11 +5,11 @@ edition = "2024"
 
 [workspace]
 members = [
-    "crates/rpc-genie-macros",
+    "service-macro",
 ]
 
 [dependencies]
-rpc-genie-macros = { path = "crates/rpc-genie-macros" }
+service-macro = { path = "service-macro" }
 rmp-serde = "1.3.1"
 serde = { version = "1", features = ["derive"] }
 thiserror = "2"
