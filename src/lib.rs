@@ -1,10 +1,15 @@
 mod single_request_sender;
 pub use single_request_sender::SingleRequestSender;
 
-mod stream_handler;
+#[doc(hidden)]
+pub mod stream_handler;
 
 #[doc(hidden)]
 pub mod send_request;
+
+#[doc(hidden)]
+pub mod topic;
+pub use topic::Topic;
 
 #[doc(hidden)]
 pub mod frame;
@@ -13,9 +18,12 @@ use std::sync::Arc;
 
 pub use rpc_genie_macros::service;
 
-use crate::frame::{
-    rpc_request::RpcRequestArgReader,
-    rpc_response::{self, RpcResponseBuilder},
+use crate::{
+    frame::{
+        rpc_request::RpcRequestArgReader,
+        rpc_response::{self, RpcResponseBuilder},
+    },
+    stream_handler::StreamId,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -91,4 +99,19 @@ where
     RequestSender: send_request::SendRequest,
 {
     fn new(request_sender: RequestSender) -> Self;
+}
+
+#[doc(hidden)]
+pub trait SubscribableStub: Sized {
+    /// Returns false is the stub is already dead, true otherwise
+    fn add_registered_topic(
+        &self,
+        topic_id: topic::TopicId,
+        stub_died_notification_sender: topic::StubDiedNotificationSender,
+    ) -> impl Future<Output = bool> + Send;
+
+    fn remove_registered_topic(&self, topic_id: topic::TopicId);
+
+    /// Returns None if the stream identity is unavailable, Some(stream_id) otherwise
+    fn stream_id(&self) -> Option<StreamId>;
 }

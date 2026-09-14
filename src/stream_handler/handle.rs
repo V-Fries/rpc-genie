@@ -1,13 +1,14 @@
 use std::{
-    collections::HashMap,
+    assert_matches,
+    collections::{HashMap, hash_map},
     mem,
     ops::Deref,
-    sync::{Arc, Weak},
+    sync::{Arc, Mutex as StdMutex, Weak},
 };
 
 use tokio::{
     io::{AsyncWrite, BufWriter, WriteHalf},
-    sync::{Mutex, MutexGuard, oneshot},
+    sync::{Mutex as TokioMutex, oneshot},
 };
 
 use crate::{
@@ -17,12 +18,15 @@ use crate::{
         rpc_response::RpcResponse,
     },
     send_request::SendRequest,
-    stream_handler::{KillRoutineSender, ResponseSender},
+    stream_handler::{KillRoutineSender, ResponseSender, StreamId},
+    topic::{self, StubDiedNotificationSender, TopicId},
 };
 
-pub struct Handle<const MAX_FRAME_SIZE: usize, Stream>(
-    pub(super) Mutex<State<MAX_FRAME_SIZE, Stream>>,
-);
+pub struct Handle<const MAX_FRAME_SIZE: usize, Stream> {
+    pub(super) state: TokioMutex<State<MAX_FRAME_SIZE, Stream>>,
+    pub(super) stream_id: StreamId,
+    pub(super) registered_topics: StdMutex<RegisteredTopics>,
+}
 
 pub(super) enum State<const MAX_FRAME_SIZE: usize, Stream> {
     Running(RunningState<MAX_FRAME_SIZE, Stream>),
@@ -31,9 +35,64 @@ pub(super) enum State<const MAX_FRAME_SIZE: usize, Stream> {
 
 pub(super) struct RunningState<const MAX_FRAME_SIZE: usize, Stream> {
     pub(super) kill_routine_sender: KillRoutineSender,
-    pub(super) request_map: Arc<Mutex<HashMap<RpcRequestId, ResponseSender>>>,
+    pub(super) request_map: Arc<TokioMutex<HashMap<RpcRequestId, ResponseSender>>>,
     pub(super) next_request_id: u64,
-    pub(super) buf_writer: Arc<Mutex<BufWriter<WriteHalf<Stream>>>>,
+    pub(super) buf_writer: Arc<TokioMutex<BufWriter<WriteHalf<Stream>>>>,
+}
+
+#[derive(Default)]
+pub(super) struct RegisteredTopics {
+    topics: Vec<RegisteredTopic>,
+    positions: HashMap<TopicId, usize>,
+}
+
+struct RegisteredTopic {
+    id: TopicId,
+    stub_died_notification_sender: topic::StubDiedNotificationSender,
+}
+
+impl RegisteredTopics {
+    fn add(
+        &mut self,
+        topic_id: TopicId,
+        stub_died_notification_sender: topic::StubDiedNotificationSender,
+    ) {
+        match self.positions.entry(topic_id) {
+            hash_map::Entry::Occupied(_) => {}
+            hash_map::Entry::Vacant(entry) => {
+                entry.insert(self.topics.len());
+
+                self.topics.push(RegisteredTopic {
+                    id: topic_id,
+                    stub_died_notification_sender,
+                });
+            }
+        }
+    }
+
+    fn remove(&mut self, topic_id: TopicId) {
+        let Some(index) = self.positions.remove(&topic_id) else {
+            return;
+        };
+
+        let last_index = self.topics.len() - 1;
+        let _removed_topic = self.topics.swap_remove(index);
+
+        if index != last_index {
+            let moved_stub_id = self.topics[index].id;
+
+            assert_matches!(
+                self.positions.insert(moved_stub_id, index),
+                Some(overwritten_index) if overwritten_index == last_index,
+            );
+        }
+    }
+
+    fn send_death_notifications(self) {
+        for topic in self.topics.into_iter() {
+            let _ = topic.stub_died_notification_sender.send(());
+        }
+    }
 }
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug, thiserror::Error)]
@@ -49,13 +108,36 @@ pub enum StopReason {
 }
 
 impl<const MAX_FRAME_SIZE: usize, Stream> Handle<MAX_FRAME_SIZE, Stream> {
-    pub(super) async fn lock(&self) -> MutexGuard<'_, State<MAX_FRAME_SIZE, Stream>> {
-        self.0.lock().await
+    #[allow(dead_code)]
+    pub async fn stop(&self) {
+        self.stop_with(StopReason::ManualStop).await
+    }
+
+    pub(super) async fn stop_with(&self, stop_reason: StopReason) {
+        self.state.lock().await.stop_with(stop_reason).await;
+        self.send_death_notifications();
+    }
+
+    fn send_death_notifications(&self) {
+        let mut registered_topics_lock = self
+            .registered_topics
+            .lock()
+            .unwrap_or_else(|poison_error| poison_error.into_inner());
+
+        mem::take(&mut *registered_topics_lock).send_death_notifications();
+    }
+}
+
+impl<const MAX_FRAME_SIZE: usize, Stream> Drop for Handle<MAX_FRAME_SIZE, Stream> {
+    fn drop(&mut self) {
+        self.send_death_notifications();
     }
 }
 
 impl<const MAX_FRAME_SIZE: usize, Stream> Drop for RunningState<MAX_FRAME_SIZE, Stream> {
     fn drop(&mut self) {
+        // Ignore result as the routine could end before we drop the handles. ie.e the receiver is
+        // dropped
         let _ = self.kill_routine_sender.try_send(());
     }
 }
@@ -126,7 +208,7 @@ where
     ) -> Result<RpcResponse, crate::CallError> {
         let (response_sender, response_receiver) = oneshot::channel();
 
-        let mut lock = self.lock().await;
+        let mut lock = self.state.lock().await;
 
         let running_state = lock
             .running_state()
@@ -174,7 +256,7 @@ where
             .response_mode(RpcResponseMode::NoResponse)
             .build();
 
-        let mut lock = self.lock().await;
+        let mut lock = self.state.lock().await;
 
         let running_state = lock
             .running_state()
@@ -203,11 +285,11 @@ impl<const MAX_FRAME_SIZE: usize, Stream> State<MAX_FRAME_SIZE, Stream> {
 
     // TODO remove allow(dead_code)
     #[allow(dead_code)]
-    pub async fn stop(&mut self) {
+    async fn stop(&mut self) {
         self.stop_with(StopReason::ManualStop).await
     }
 
-    pub(super) async fn stop_with(&mut self, stop_reason: StopReason) {
+    async fn stop_with(&mut self, stop_reason: StopReason) {
         match self {
             State::Running(state) => {
                 // Don't check for error as the receiver could already be dropped (this is expected
@@ -215,10 +297,7 @@ impl<const MAX_FRAME_SIZE: usize, Stream> State<MAX_FRAME_SIZE, Stream> {
                 // the routine ended on it's own)
                 let _ = state.kill_routine_sender.send(()).await;
 
-                let mut request_map = HashMap::new();
-                mem::swap(&mut request_map, &mut *state.request_map.lock().await);
-
-                for sender in request_map.into_values() {
+                for sender in mem::take(&mut *state.request_map.lock().await).into_values() {
                     let _ = sender.send(Err(stop_reason.clone()));
                 }
 
@@ -260,5 +339,101 @@ where
         Frame::RpcRequest(request)
             .write_frame::<MAX_FRAME_SIZE>(&mut *self.buf_writer.lock().await)
             .await
+    }
+}
+
+impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub
+    for Arc<Handle<MAX_FRAME_SIZE, Stream>>
+where
+    Stream: Send,
+{
+    async fn add_registered_topic(
+        &self,
+        topic_id: topic::TopicId,
+        stub_died_notification_sender: topic::StubDiedNotificationSender,
+    ) -> bool {
+        self.deref()
+            .add_registered_topic(topic_id, stub_died_notification_sender)
+            .await
+    }
+
+    fn remove_registered_topic(&self, topic_id: topic::TopicId) {
+        self.deref().remove_registered_topic(topic_id)
+    }
+
+    fn stream_id(&self) -> Option<StreamId> {
+        self.deref().stream_id()
+    }
+}
+
+impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub
+    for Weak<Handle<MAX_FRAME_SIZE, Stream>>
+where
+    Stream: Send,
+{
+    async fn add_registered_topic(
+        &self,
+        topic_id: topic::TopicId,
+        stub_died_notification_sender: topic::StubDiedNotificationSender,
+    ) -> bool {
+        let Some(handle) = self.upgrade() else {
+            return false;
+        };
+
+        handle
+            .deref()
+            .add_registered_topic(topic_id, stub_died_notification_sender)
+            .await
+    }
+
+    fn remove_registered_topic(&self, topic_id: topic::TopicId) {
+        let Some(handle) = self.upgrade() else {
+            return;
+        };
+
+        handle.deref().remove_registered_topic(topic_id)
+    }
+
+    fn stream_id(&self) -> Option<StreamId> {
+        self.upgrade()?.deref().stream_id()
+    }
+}
+
+impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub for Handle<MAX_FRAME_SIZE, Stream>
+where
+    Stream: Send,
+{
+    async fn add_registered_topic(
+        &self,
+        topic_id: TopicId,
+        stub_died_notification_sender: StubDiedNotificationSender,
+    ) -> bool {
+        let mut lock = self.state.lock().await;
+
+        let Ok(_) = lock.running_state() else {
+            return false;
+        };
+
+        // Don't drop(lock) yet, we want to finish the add below first
+
+        // MAKE SURE NOT TO AWAIT ANYTHING WHILE THIS MUTEX IS HELD
+        self.registered_topics
+            .lock()
+            .unwrap_or_else(|poison_error| poison_error.into_inner())
+            .add(topic_id, stub_died_notification_sender);
+
+        true
+    }
+
+    fn remove_registered_topic(&self, topic_id: TopicId) {
+        // MAKE SURE NOT TO AWAIT ANYTHING WHILE THIS MUTEX IS HELD
+        self.registered_topics
+            .lock()
+            .unwrap_or_else(|poison_error| poison_error.into_inner())
+            .remove(topic_id)
+    }
+
+    fn stream_id(&self) -> Option<StreamId> {
+        Some(self.stream_id)
     }
 }

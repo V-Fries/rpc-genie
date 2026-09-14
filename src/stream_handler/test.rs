@@ -12,7 +12,7 @@ use crate::{
     send_request::SendRequest,
 };
 
-use super::{StopReason, StreamId, start_routine};
+use super::{StopReason, StreamId, spawn_routine};
 
 const MAX_FRAME_SIZE: usize = 1024;
 
@@ -59,9 +59,9 @@ async fn start_test_routine() -> (
 ) {
     let (server_stream, client_stream) = tokio::io::duplex(4096);
 
-    let handle = start_routine::<MAX_FRAME_SIZE, _, _, TestStub>(
+    let handle = spawn_routine::<MAX_FRAME_SIZE, _, _, TestStub>(
         server_stream,
-        StreamId::from(1),
+        StreamId::next(),
         Arc::new(TestHandler),
     )
     .await;
@@ -186,7 +186,7 @@ async fn stop_resolves_pending_call() {
     .unwrap()
     .unwrap();
 
-    handle.lock().await.stop().await;
+    handle.stop().await;
 
     let error = tokio::time::timeout(std::time::Duration::from_secs(1), call_task)
         .await

@@ -83,8 +83,6 @@ where
                     };
 
                     handle
-                        .lock()
-                        .await
                         .stop_with(StopReason::StreamReadError {
                             details: err.to_string(),
                         })
@@ -155,8 +153,6 @@ where
                 };
 
                 handle
-                    .lock()
-                    .await
                     .stop_with(StopReason::StreamWriteError {
                         details: err.to_string(),
                     })

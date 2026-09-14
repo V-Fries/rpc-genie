@@ -24,6 +24,7 @@ impl Service {
         let remote_methods_callers =
             remote_methods_callers(&stub_struct_name, associated_remote_methods);
         let impl_stub_trait = self.impl_stub_trait(&stub_struct_name);
+        let impl_subscribable_stub_trait = impl_subscribable_stub_trait(&stub_struct_name);
 
         quote! {
             #[derive(Clone)]
@@ -33,6 +34,7 @@ impl Service {
             }
 
             #impl_stub_trait
+            #impl_subscribable_stub_trait
 
             #remote_methods_callers
         }
@@ -130,6 +132,41 @@ fn remote_method_caller(
             #(#remove_unused_var_warning)*
 
             todo!("Send the request to server and receive the response")
+        }
+    }
+}
+
+fn impl_subscribable_stub_trait(stub_struct_name: &TokenStream) -> TokenStream {
+    quote! {
+        impl<RequestSender> rpc_genie::SubscribableStub for #stub_struct_name<RequestSender>
+        where
+            RequestSender: rpc_genie::SubscribableStub + Sync,
+        {
+            async fn add_registered_topic(
+                &self,
+                topic_id: rpc_genie::topic::TopicId,
+                stub_died_notification_sender: rpc_genie::topic::StubDiedNotificationSender,
+            ) -> bool {
+                rpc_genie::SubscribableStub::add_registered_topic(
+                    &self.__rpc_genie_request_sender__,
+                    topic_id,
+                    stub_died_notification_sender,
+                ).await
+            }
+
+            fn remove_registered_topic(
+                &self,
+                topic_id: rpc_genie::topic::TopicId
+            ) {
+                rpc_genie::SubscribableStub::remove_registered_topic(
+                    &self.__rpc_genie_request_sender__,
+                    topic_id,
+                )
+            }
+
+            fn stream_id(&self) -> Option<rpc_genie::stream_handler::StreamId> {
+                rpc_genie::SubscribableStub::stream_id(&self.__rpc_genie_request_sender__)
+            }
         }
     }
 }
