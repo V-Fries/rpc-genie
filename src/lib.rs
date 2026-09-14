@@ -16,7 +16,7 @@ pub mod frame;
 
 use std::sync::Arc;
 
-pub use rpc_genie_macros::service;
+pub use service_macro::service;
 
 use crate::{
     frame::{

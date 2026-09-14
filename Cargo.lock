@@ -151,19 +151,10 @@ name = "rpc-genie"
 version = "0.1.0"
 dependencies = [
  "rmp-serde",
- "rpc-genie-macros",
  "serde",
+ "service-macro",
  "thiserror",
  "tokio",
-]
-
-[[package]]
-name = "rpc-genie-macros"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -196,6 +187,15 @@ name = "serde_derive"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "service-macro"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
