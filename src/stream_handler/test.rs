@@ -186,7 +186,7 @@ async fn stop_resolves_pending_call() {
     .unwrap()
     .unwrap();
 
-    handle.lock().await.stop().await;
+    handle.stop().await;
 
     let error = tokio::time::timeout(std::time::Duration::from_secs(1), call_task)
         .await

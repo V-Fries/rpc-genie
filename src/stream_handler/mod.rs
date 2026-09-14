@@ -34,7 +34,7 @@ mod test;
 /// other branch completes first, then some data may be lost.
 // TODO remove allow dead_code
 #[allow(dead_code)]
-pub async fn start_routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, Stub>(
+pub(crate) async fn start_routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, Stub>(
     stream: Stream,
     stream_id: StreamId,
     request_handler: Arc<RequestHandler>,
@@ -50,14 +50,16 @@ where
     // Using mpsc so that we can emit the kill msg from multiple sources
     let (kill_routine_sender, kill_routine_receiver) = mpsc::channel::<()>(1);
 
-    let handle = Arc::new(Handle::<MAX_FRAME_SIZE, Stream>(Mutex::new(
-        handle::State::Running(handle::RunningState {
+    let handle = Arc::new(Handle::<MAX_FRAME_SIZE, Stream> {
+        state: Mutex::new(handle::State::Running(handle::RunningState {
             kill_routine_sender,
             request_map: Arc::clone(&request_map),
             next_request_id: 0,
             buf_writer: Arc::clone(&buf_writer),
-        }),
-    )));
+        })),
+        stream_id,
+        registered_topics: Default::default(),
+    });
 
     let handle_weak_ref = Arc::downgrade(&handle);
     tokio::spawn(async move {
