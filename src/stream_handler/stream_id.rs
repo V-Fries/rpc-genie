@@ -1,19 +1,18 @@
-use std::{fmt::Debug, os::fd::RawFd, time::Instant};
+use std::{
+    fmt::Debug,
+    sync::atomic::{self, AtomicU64},
+};
 
 // TODO remove allow dead_code
 #[allow(dead_code)]
-#[derive(Debug, Clone, Copy)]
-pub struct StreamId {
-    fd: RawFd,
-    creation_time: Instant,
-}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StreamId(u64);
 
-impl From<RawFd> for StreamId {
-    fn from(fd: RawFd) -> Self {
-        Self {
-            fd,
-            creation_time: Instant::now(),
-        }
+impl StreamId {
+    pub fn next() -> Self {
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+
+        Self(NEXT_ID.fetch_add(1, atomic::Ordering::Relaxed))
     }
 }
 

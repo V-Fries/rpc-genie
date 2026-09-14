@@ -61,7 +61,7 @@ async fn start_test_routine() -> (
 
     let handle = start_routine::<MAX_FRAME_SIZE, _, _, TestStub>(
         server_stream,
-        StreamId::from(1),
+        StreamId::next(),
         Arc::new(TestHandler),
     )
     .await;
