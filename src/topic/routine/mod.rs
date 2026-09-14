@@ -45,7 +45,7 @@ impl<Stub> Routine<Stub>
 where
     Stub: Send + Sync + SubscribableStub + 'static,
 {
-    pub async fn start() -> (
+    pub async fn spawn() -> (
         RoutineCommandSender<Stub>,
         Arc<RwLock<SubscribedStubs<Stub>>>,
     ) {

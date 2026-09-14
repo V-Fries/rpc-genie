@@ -33,7 +33,7 @@ where
     Stub: Send + Sync + SubscribableStub + 'static,
 {
     pub async fn new() -> Self {
-        let (sender, subscribed_stubs) = Routine::start().await;
+        let (sender, subscribed_stubs) = Routine::spawn().await;
 
         Self {
             subscribed_stubs,
