@@ -103,8 +103,7 @@ where
 
 #[doc(hidden)]
 pub trait SubscribableStub: Sized {
-    /// Returns true on success, false on failure.
-    /// Fails if the stub is already dead.
+    /// Returns false is the stub is already dead, true otherwise
     fn add_registered_topic(
         &self,
         topic_id: topic::TopicId,
@@ -113,5 +112,6 @@ pub trait SubscribableStub: Sized {
 
     fn remove_registered_topic(&self, topic_id: topic::TopicId);
 
-    fn stream_id(&self) -> StreamId;
+    /// Returns None if the stub is already dead, Some(stream_id) otherwise
+    fn stream_id(&self) -> Option<StreamId>;
 }

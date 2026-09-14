@@ -97,7 +97,9 @@ where
     }
 
     async fn handle_stub_subscribed(&mut self, stub: Stub) {
-        let stream_id = stub.stream_id();
+        let Some(stream_id) = stub.stream_id() else {
+            return;
+        };
 
         if let Some(stub_died_receiver) =
             self.subscribed_stubs.write().await.add(stub, self.id).await

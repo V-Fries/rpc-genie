@@ -347,8 +347,66 @@ where
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream: Send> crate::SubscribableStub
-    for Handle<MAX_FRAME_SIZE, Stream>
+impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub
+    for Arc<Handle<MAX_FRAME_SIZE, Stream>>
+where
+    Stream: Send,
+{
+    async fn add_registered_topic(
+        &self,
+        topic_id: topic::TopicId,
+        stub_died_notification_sender: topic::StubDiedNotificationSender,
+    ) -> bool {
+        self.deref()
+            .add_registered_topic(topic_id, stub_died_notification_sender)
+            .await
+    }
+
+    fn remove_registered_topic(&self, topic_id: topic::TopicId) {
+        self.deref().remove_registered_topic(topic_id)
+    }
+
+    fn stream_id(&self) -> Option<StreamId> {
+        self.deref().stream_id()
+    }
+}
+
+impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub
+    for Weak<Handle<MAX_FRAME_SIZE, Stream>>
+where
+    Stream: Send,
+{
+    async fn add_registered_topic(
+        &self,
+        topic_id: topic::TopicId,
+        stub_died_notification_sender: topic::StubDiedNotificationSender,
+    ) -> bool {
+        let Some(handle) = self.upgrade() else {
+            return false;
+        };
+
+        handle
+            .deref()
+            .add_registered_topic(topic_id, stub_died_notification_sender)
+            .await
+    }
+
+    fn remove_registered_topic(&self, topic_id: topic::TopicId) {
+        let Some(handle) = self.upgrade() else {
+            return;
+        };
+
+        handle.deref().remove_registered_topic(topic_id)
+    }
+
+    fn stream_id(&self) -> Option<StreamId> {
+        self.upgrade()?.deref().stream_id()
+    }
+}
+
+impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub for Handle<MAX_FRAME_SIZE, Stream>
+where
+    Stream: Send,
 {
     async fn add_registered_topic(
         &self,
@@ -380,7 +438,7 @@ impl<const MAX_FRAME_SIZE: usize, Stream: Send> crate::SubscribableStub
             .remove(topic_id)
     }
 
-    fn stream_id(&self) -> StreamId {
-        self.stream_id
+    fn stream_id(&self) -> Option<StreamId> {
+        Some(self.stream_id)
     }
 }

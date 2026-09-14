@@ -164,7 +164,7 @@ fn impl_subscribable_stub_trait(stub_struct_name: &TokenStream) -> TokenStream {
                 )
             }
 
-            fn stream_id(&self) -> rpc_genie::stream_handler::StreamId {
+            fn stream_id(&self) -> Option<rpc_genie::stream_handler::StreamId> {
                 rpc_genie::SubscribableStub::stream_id(&self.__rpc_genie_request_sender__)
             }
         }

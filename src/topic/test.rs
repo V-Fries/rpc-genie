@@ -66,8 +66,8 @@ impl SubscribableStub for TestStub {
         state.registered_topic_count -= 1;
     }
 
-    fn stream_id(&self) -> StreamId {
-        self.stream_id
+    fn stream_id(&self) -> Option<StreamId> {
+        Some(self.stream_id)
     }
 }
 
