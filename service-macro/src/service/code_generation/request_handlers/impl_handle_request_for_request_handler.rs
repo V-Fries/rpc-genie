@@ -7,19 +7,22 @@ pub fn impl_handle_request_for_request_handler(
     request_handler_struct_name: &TokenStream,
     associated_state_struct_name: &TokenStream,
     associated_remote_methods: &[RemoteMethod],
-    opposite_stub_struct_name: &TokenStream,
+    generic_opposite_stub_struct_name: &TokenStream,
 ) -> TokenStream {
     let fn_content = fn_content(associated_state_struct_name, associated_remote_methods);
 
     quote! {
-        impl<RequestSender: rpc_genie::send_request::SendRequest>
-            rpc_genie::HandleRequest<#opposite_stub_struct_name<RequestSender>>
+        impl<RequestSender>
+            rpc_genie::HandleRequest<#generic_opposite_stub_struct_name<RequestSender>>
             for #request_handler_struct_name
+        where
+            RequestSender: Send + Sync,
         {
             async fn handle_request(
                 &self,
                 method_path: &str,
-                __rpc_stub__: #opposite_stub_struct_name<RequestSender>,
+                __rpc_opposite_stub_weak_handle__:
+                    &std::sync::Arc<#generic_opposite_stub_struct_name<RequestSender>>,
                 mut __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
             ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
                 rpc_genie::frame::rpc_response::builder::Uninit,
@@ -39,7 +42,7 @@ fn fn_content(
         self.sub_services
             .handle_request(
                 method_path,
-                __rpc_stub__,
+                __rpc_opposite_stub_weak_handle__,
                 __rpc_request_arg_reader__,
             )
             .await

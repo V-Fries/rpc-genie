@@ -1,4 +1,7 @@
-use std::sync::{Arc, Weak};
+use std::{
+    assert_matches,
+    sync::{Arc, Weak},
+};
 
 use tokio::io::{BufReader, BufWriter};
 
@@ -34,7 +37,7 @@ impl HandleRequest<TestStub> for TestHandler {
     async fn handle_request(
         &self,
         method_path: &str,
-        _stub: TestStub,
+        _stub: &Arc<TestStub>,
         _args: crate::frame::rpc_request::RpcRequestArgReader,
     ) -> crate::frame::rpc_response::RpcResponseBuilder<
         crate::frame::rpc_response::builder::Uninit,
@@ -193,10 +196,10 @@ async fn stop_resolves_pending_call() {
         .unwrap()
         .unwrap()
         .unwrap_err();
-    assert!(matches!(
+    assert_matches!(
         error,
         crate::CallError::RoutineIsStopped(StopReason::ManualStop)
-    ));
+    );
 }
 
 #[tokio::test]
@@ -224,8 +227,8 @@ async fn peer_disconnect_resolves_pending_call() {
         .unwrap()
         .unwrap()
         .unwrap_err();
-    assert!(matches!(
+    assert_matches!(
         error,
         crate::CallError::RoutineIsStopped(StopReason::StreamReadError { .. })
-    ));
+    );
 }

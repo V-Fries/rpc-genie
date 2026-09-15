@@ -33,7 +33,7 @@ impl<Stub> Drop for StubDeathNotificationReceiverTasks<Stub> {
 
 impl<Stub> StubDeathNotificationReceiverTasks<Stub>
 where
-    Stub: Send + 'static,
+    Stub: Send + Sync + 'static,
 {
     pub fn new(routine_command_sender: RoutineCommandWeakSender<Stub>) -> Self {
         Self {

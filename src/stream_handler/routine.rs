@@ -1,6 +1,5 @@
 use std::{
     collections::HashMap,
-    marker::PhantomData,
     ops::DerefMut,
     sync::{Arc, Weak},
 };
@@ -17,25 +16,25 @@ use crate::{
         rpc_request::{RpcRequest, RpcRequestArgReader, RpcResponseMode},
         rpc_response::RpcResponse,
     },
-    stream_handler::{self, KillRoutineReceiver, ResponseSender, stream_id::StreamId},
+    stream_handler::{KillRoutineReceiver, ResponseSender, stream_id::StreamId},
 };
 
 // TODO remove allow dead_code
 #[allow(dead_code)]
-pub(super) struct Routine<const MAX_FRAME_SIZE: usize, RequestHandler, Stub, Stream> {
+pub(super) struct Routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, WeakOppositeStub> {
     pub stream_id: StreamId,
     pub request_handler: Arc<RequestHandler>,
     pub request_map: Arc<Mutex<HashMap<RpcRequestId, ResponseSender>>>,
     pub handle: Weak<super::Handle<MAX_FRAME_SIZE, Stream>>,
-    pub _stream: PhantomData<fn() -> Stub>,
+    pub weak_opposite_stub: Arc<WeakOppositeStub>,
 }
 
-impl<const MAX_FRAME_SIZE: usize, RequestHandler, Stub, Stream>
-    Routine<MAX_FRAME_SIZE, RequestHandler, Stub, Stream>
+impl<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, WeakOppositeStub>
+    Routine<MAX_FRAME_SIZE, Stream, RequestHandler, WeakOppositeStub>
 where
-    RequestHandler: HandleRequest<Stub>,
     Stream: AsyncWrite + AsyncRead + Send + 'static,
-    Stub: crate::Stub<Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>>,
+    RequestHandler: HandleRequest<WeakOppositeStub>,
+    WeakOppositeStub: crate::Stub<Weak<super::Handle<MAX_FRAME_SIZE, Stream>>>,
 {
     pub async fn routine(
         self,
@@ -93,6 +92,7 @@ where
                 Frame::RpcRequest(request) => {
                     let request_handler_clone = Arc::clone(&self.request_handler);
                     let handle_clone = self.handle.clone();
+                    let stub_clone = self.weak_opposite_stub.clone();
                     let buf_writer_clone = Arc::clone(&buf_writer);
                     tokio::spawn(async move {
                         Self::handle_rpc_request(
@@ -100,6 +100,7 @@ where
                             request_handler_clone,
                             request,
                             handle_clone,
+                            stub_clone,
                             buf_writer_clone,
                         )
                         .await
@@ -115,6 +116,7 @@ where
         request_handler: Arc<RequestHandler>,
         request: RpcRequest,
         handle: Weak<super::Handle<MAX_FRAME_SIZE, Stream>>,
+        weak_opposite_stub: Arc<WeakOppositeStub>,
         buf_writer: Arc<Mutex<BufWriter<WriteHalf<Stream>>>>,
     ) where
         Stream: AsyncWrite,
@@ -124,7 +126,7 @@ where
         let response_builder = request_handler
             .handle_request(
                 &request.method_path,
-                Stub::new(handle.clone(), None),
+                &weak_opposite_stub,
                 request_arg_reader,
             )
             .await;

@@ -8,7 +8,6 @@ use routine::Routine;
 mod stream_id;
 pub use stream_id::StreamId;
 
-use std::marker::PhantomData;
 use std::sync::Weak;
 use std::{collections::HashMap, sync::Arc};
 
@@ -34,15 +33,20 @@ mod test;
 /// other branch completes first, then some data may be lost.
 // TODO remove allow dead_code
 #[allow(dead_code)]
-pub(crate) async fn spawn_routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, Stub>(
+pub(crate) async fn spawn_routine<
+    const MAX_FRAME_SIZE: usize,
+    Stream,
+    RequestHandler,
+    WeakOppositeStub,
+>(
     stream: Stream,
     stream_id: StreamId,
     request_handler: Arc<RequestHandler>,
 ) -> Arc<Handle<MAX_FRAME_SIZE, Stream>>
 where
-    RequestHandler: HandleRequest<Stub>,
-    Stub: crate::Stub<Weak<Handle<MAX_FRAME_SIZE, Stream>>>,
     Stream: AsyncWrite + AsyncRead + Send + 'static,
+    RequestHandler: HandleRequest<WeakOppositeStub>,
+    WeakOppositeStub: crate::Stub<Weak<Handle<MAX_FRAME_SIZE, Stream>>>,
 {
     let (read_stream, write_stream) = tokio::io::split(stream);
     let buf_writer = Arc::new(Mutex::new(BufWriter::new(write_stream)));
@@ -63,12 +67,12 @@ where
 
     let handle_weak_ref = Arc::downgrade(&handle);
     tokio::spawn(async move {
-        Routine::<MAX_FRAME_SIZE, RequestHandler, Stub, Stream> {
+        Routine::<MAX_FRAME_SIZE, Stream, RequestHandler, WeakOppositeStub> {
             stream_id,
             request_handler,
-            handle: handle_weak_ref,
+            handle: handle_weak_ref.clone(),
             request_map,
-            _stream: PhantomData,
+            weak_opposite_stub: Arc::new(WeakOppositeStub::new(handle_weak_ref, None)),
         }
         .routine(kill_routine_receiver, read_stream, buf_writer)
         .await

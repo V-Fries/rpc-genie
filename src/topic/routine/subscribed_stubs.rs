@@ -1,6 +1,7 @@
 use std::{
     assert_matches,
     collections::{HashMap, hash_map},
+    sync::Arc,
 };
 
 use tokio::sync::oneshot;
@@ -15,7 +16,7 @@ pub struct SubscribedStubs<Stub>
 where
     Stub: SubscribableStub,
 {
-    stubs: Vec<(StreamId, Stub)>,
+    stubs: Vec<(StreamId, Arc<Stub>)>,
     positions: HashMap<StreamId, usize>,
     topic_id: TopicId,
 }
@@ -43,7 +44,7 @@ where
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Stub> {
+    pub fn iter(&self) -> impl Iterator<Item = &Arc<Stub>> {
         self.stubs.iter().map(|(_stream_id, stub)| stub)
     }
 
@@ -51,7 +52,7 @@ where
     /// the stub was already present
     pub(super) async fn add(
         &mut self,
-        stub: Stub,
+        stub: Arc<Stub>,
         topic_id: TopicId,
     ) -> Option<StubDiedNotificationReceiver> {
         let (sender, receiver) = oneshot::channel();

@@ -22,11 +22,11 @@ struct TestStubState {
 }
 
 impl TestStub {
-    fn new() -> Self {
-        Self {
+    fn new() -> Arc<Self> {
+        Arc::new(Self {
             state: Arc::new(Mutex::new(TestStubState::default())),
             stream_id: StreamId::next(),
-        }
+        })
     }
 
     fn stream_id(&self) -> StreamId {
@@ -235,7 +235,7 @@ impl SubscribableStub for NoStreamIdStub {
 async fn subscribe_stub_with_no_stream_id_is_noop() {
     let topic = Topic::new().await;
 
-    topic.subscribe(NoStreamIdStub).await;
+    topic.subscribe(Arc::new(NoStreamIdStub)).await;
 
     assert!(topic.map(|_| async {}).await.is_empty());
 }
@@ -308,7 +308,7 @@ async fn map_and_for_each_on_empty_topic() {
 #[tokio::test]
 async fn concurrent_subscribes() {
     let topic = Topic::new().await;
-    let stubs: Vec<TestStub> = (0..10).map(|_| TestStub::new()).collect();
+    let stubs = (0..10).map(|_| TestStub::new()).collect::<Vec<_>>();
 
     let mut handles = Vec::new();
     for stub in &stubs {

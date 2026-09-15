@@ -6,8 +6,18 @@ use crate::service::{RemoteMethod, Service, SubService, code_generation::utils::
 
 impl Service {
     pub fn stubs(&self) -> TokenStream {
-        let client_stub = self.stub(quote!(ClientStub), &self.client_remote_methods);
-        let server_stub = self.stub(quote!(ServerStub), &self.server_remote_methods);
+        let client_stub = self.stub(
+            quote!(GenericClientStub),
+            quote!(ClientStubArcHandle),
+            quote!(ClientStubWeakHandle),
+            &self.client_remote_methods,
+        );
+        let server_stub = self.stub(
+            quote!(GenericServerStub),
+            quote!(ServerStubArcHandle),
+            quote!(ServerStubWeakHandle),
+            &self.server_remote_methods,
+        );
 
         quote! {
             #server_stub
@@ -17,22 +27,36 @@ impl Service {
 
     fn stub(
         &self,
-        stub_struct_name: TokenStream,
+        generic_stub_struct_name: TokenStream,
+        arc_stub_struct_name: TokenStream,
+        weak_stub_struct_name: TokenStream,
         associated_remote_methods: &[RemoteMethod],
     ) -> TokenStream {
-        let struct_fields = self.stub_struct_fields(&stub_struct_name);
+        let sub_services_stub_fields = self.sub_services_stub_fields(&generic_stub_struct_name);
         let remote_methods_callers =
-            remote_methods_callers(&stub_struct_name, associated_remote_methods);
-        let impl_stub_trait = self.impl_stub_trait(&stub_struct_name);
-        let impl_subscribable_stub_trait = impl_subscribable_stub_trait(&stub_struct_name);
+            remote_methods_callers(&generic_stub_struct_name, associated_remote_methods);
+        let impl_stub_trait = self.impl_stub_trait(&generic_stub_struct_name);
+        let impl_subscribable_stub_trait = impl_subscribable_stub_trait(&generic_stub_struct_name);
 
         quote! {
             #[derive(Clone)]
-            pub struct #stub_struct_name<RequestSender> {
+            #[doc(hidden)]
+            pub struct #generic_stub_struct_name<RequestSender> {
                 __rpc_genie_request_sender__: RequestSender,
-                #struct_fields
                 __rpc_service_path__: Option<String>,
+                #sub_services_stub_fields
             }
+
+            pub type #arc_stub_struct_name<const MAX_FRAME_SIZE: usize, Stream> =
+                #generic_stub_struct_name<
+                    std::sync::Arc<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>
+                >;
+
+            pub type #weak_stub_struct_name<const MAX_FRAME_SIZE: usize, Stream> =
+                #generic_stub_struct_name<
+                    std::sync::Weak<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>
+                >;
+
 
             #impl_stub_trait
             #impl_subscribable_stub_trait
@@ -41,7 +65,7 @@ impl Service {
         }
     }
 
-    fn stub_struct_fields(&self, stub_struct_name: &TokenStream) -> TokenStream {
+    fn sub_services_stub_fields(&self, generic_stub_struct_name: &TokenStream) -> TokenStream {
         self.sub_services.iter().fold(
             TokenStream::new(),
             |acc,
@@ -53,13 +77,14 @@ impl Service {
              }| {
                 quote! {
                     #acc
-                    #pub_keyword #name #colon #path::#stub_struct_name<RequestSender>,
+                    #pub_keyword #name #colon
+                        std::sync::Arc<#path::#generic_stub_struct_name<RequestSender>>,
                 }
             },
         )
     }
 
-    fn impl_stub_trait(&self, stub_struct_name: &TokenStream) -> TokenStream {
+    fn impl_stub_trait(&self, generic_stub_struct_name: &TokenStream) -> TokenStream {
         let field_constructor = self.sub_services.iter().map(
             |SubService {
                  pub_keyword: _,
@@ -70,21 +95,24 @@ impl Service {
                 let str_to_add_to_service_path = LitStr::new(&format!("{name}/"), name.span());
 
                 quote! {
-                    #name #colon #path::#stub_struct_name::<RequestSender>::new(
-                        request_sender.clone(),
-                        Some(match service_path {
-                            Some(ref service_path) => {
-                                service_path.to_owned() + #str_to_add_to_service_path
-                            }
-                            None => #str_to_add_to_service_path.to_owned(),
-                        })
+                    #name #colon std::sync::Arc::new(
+                        #path::#generic_stub_struct_name::<RequestSender>::new(
+                            request_sender.clone(),
+                            Some(match service_path {
+                                Some(ref service_path) => {
+                                    service_path.to_owned() + #str_to_add_to_service_path
+                                }
+                                None => #str_to_add_to_service_path.to_owned(),
+                            })
+                        )
                     )
                 }
             },
         );
 
         quote! {
-            impl<RequestSender> rpc_genie::Stub<RequestSender> for #stub_struct_name<RequestSender>
+            impl<RequestSender> rpc_genie::Stub<RequestSender>
+                for #generic_stub_struct_name<RequestSender>
             where
                 RequestSender: rpc_genie::send_request::SendRequest,
             {
@@ -101,13 +129,13 @@ impl Service {
 }
 
 fn remote_methods_callers(
-    stub_struct_name: &TokenStream,
+    generic_stub_struct_name: &TokenStream,
     associated_remote_methods: &[RemoteMethod],
 ) -> TokenStream {
     let associated_remote_methods = associated_remote_methods.iter().map(remote_method_caller);
 
     quote! {
-        impl<RequestSender> #stub_struct_name<RequestSender>
+        impl<RequestSender> #generic_stub_struct_name<RequestSender>
         where
             RequestSender: rpc_genie::send_request::SendRequest,
         {
@@ -160,11 +188,12 @@ fn remote_method_caller(
     }
 }
 
-fn impl_subscribable_stub_trait(stub_struct_name: &TokenStream) -> TokenStream {
+fn impl_subscribable_stub_trait(generic_stub_struct_name: &TokenStream) -> TokenStream {
     quote! {
-        impl<RequestSender> rpc_genie::SubscribableStub for #stub_struct_name<RequestSender>
+        impl<RequestSender> rpc_genie::SubscribableStub
+            for #generic_stub_struct_name<RequestSender>
         where
-            RequestSender: rpc_genie::SubscribableStub + Sync,
+            RequestSender: rpc_genie::SubscribableStub + Sync + Send,
         {
             async fn add_registered_topic(
                 &self,
