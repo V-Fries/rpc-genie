@@ -78,7 +78,7 @@ fn match_branch(
                 Err(err) => {
                     return rpc_genie::frame::rpc_response::RpcResponse::builder().error(
                         rpc_genie::frame::rpc_response::RpcResponseError::FailedToDeserializeArg {
-                            details: err.to_string(),
+                            serialize_error: err.to_string(),
                         },
                     );
                 },

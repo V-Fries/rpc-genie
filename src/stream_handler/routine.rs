@@ -17,7 +17,7 @@ use crate::{
         rpc_request::{RpcRequest, RpcRequestArgReader, RpcResponseMode},
         rpc_response::RpcResponse,
     },
-    stream_handler::{self, KillRoutineReceiver, ResponseSender, StopReason, stream_id::StreamId},
+    stream_handler::{self, KillRoutineReceiver, ResponseSender, stream_id::StreamId},
 };
 
 // TODO remove allow dead_code
@@ -82,11 +82,7 @@ where
                         break;
                     };
 
-                    handle
-                        .stop_with(StopReason::StreamReadError {
-                            details: err.to_string(),
-                        })
-                        .await;
+                    handle.stop_with(err.into()).await;
                     break;
                 }
             };
@@ -152,11 +148,7 @@ where
                     return;
                 };
 
-                handle
-                    .stop_with(StopReason::StreamWriteError {
-                        details: err.to_string(),
-                    })
-                    .await;
+                handle.stop_with(err.into()).await;
             }
         }
     }
