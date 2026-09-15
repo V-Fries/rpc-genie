@@ -32,7 +32,9 @@ impl Frame {
         self,
         stream: &mut BufWriter<impl AsyncWrite + Unpin>,
     ) -> Result<(), WriteError> {
-        let data = rmp_serde::to_vec(&self)?;
+        let data = rmp_serde::to_vec(&self).map_err(|err| WriteError::SerializeFrame {
+            serialize_error: err.to_string(),
+        })?;
 
         if data.len() > MAX_FRAME_SIZE {
             return Err(WriteError::FrameTooBig {
@@ -44,13 +46,19 @@ impl Frame {
         stream
             .write_u64(data.len() as u64)
             .await
-            .map_err(WriteError::WriteFrameSize)?;
+            .map_err(|err| WriteError::WriteFrameSize {
+                io_error: err.to_string(),
+            })?;
         stream
             .write_all(&data)
             .await
-            .map_err(WriteError::WriteFrame)?;
+            .map_err(|err| WriteError::WriteFrame {
+                io_error: err.to_string(),
+            })?;
 
-        stream.flush().await.map_err(WriteError::FlushStream)
+        stream.flush().await.map_err(|err| WriteError::FlushStream {
+            io_error: err.to_string(),
+        })
     }
 
     /// # Cancel safety
@@ -60,7 +68,12 @@ impl Frame {
     pub async fn read_frame<const MAX_FRAME_SIZE: usize>(
         stream: &mut BufReader<impl AsyncRead + Unpin>,
     ) -> Result<Self, ReadError> {
-        let size = stream.read_u64().await.map_err(ReadError::ReadFrameSize)? as usize;
+        let size = stream
+            .read_u64()
+            .await
+            .map_err(|err| ReadError::ReadFrameSize {
+                io_error: err.to_string(),
+            })? as usize;
 
         if size > MAX_FRAME_SIZE {
             return Err(ReadError::FrameTooBig {
@@ -69,12 +82,15 @@ impl Frame {
             });
         }
 
+        // TODO consider using try_reserve
         let mut frame_bytes = Vec::<u8>::with_capacity(size);
         stream
             .take(size as u64)
             .read_to_end(&mut frame_bytes)
             .await
-            .map_err(ReadError::ReadFrame)?;
+            .map_err(|err| ReadError::ReadFrame {
+                io_error: err.to_string(),
+            })?;
         if frame_bytes.len() != size {
             return Err(ReadError::MissingData {
                 expected_size: size,
@@ -82,8 +98,8 @@ impl Frame {
             });
         }
 
-        let frame = rmp_serde::from_slice(&frame_bytes)?;
-
-        Ok(frame)
+        rmp_serde::from_slice(&frame_bytes).map_err(|err| ReadError::DeserializeFrame {
+            deserialize_error: err.to_string(),
+        })
     }
 }

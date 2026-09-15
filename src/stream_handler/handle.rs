@@ -99,10 +99,10 @@ impl RegisteredTopics {
 pub enum StopReason {
     #[error("The routine was stopped manually")]
     ManualStop,
-    #[error("Error while reading from stream: {details}")]
-    StreamReadError { details: String },
-    #[error("Error while writing to stream: {details}")]
-    StreamWriteError { details: String },
+    #[error("Error while reading from stream")]
+    StreamReadError(#[from] frame::ReadError),
+    #[error("Error while writing to stream")]
+    StreamWriteError(#[from] frame::WriteError),
     #[error("The handle was already dropped")]
     HandleWasDropped,
 }
@@ -170,9 +170,7 @@ where
         request_builder: RpcRequestBuilder<RpcRequestBuilderUninit, String>,
     ) -> Result<RpcResponse, crate::CallError> {
         let Some(handle) = self.upgrade() else {
-            return Err(crate::CallError::RoutineIsStopped(
-                StopReason::HandleWasDropped,
-            ));
+            return Err(StopReason::HandleWasDropped.into());
         };
 
         handle.deref().call(request_builder).await
@@ -183,9 +181,7 @@ where
         request_builder: RpcRequestBuilder<RpcRequestBuilderUninit, String>,
     ) -> Result<(), crate::NotifyError> {
         let Some(handle) = self.upgrade() else {
-            return Err(crate::NotifyError::RoutineIsStopped(
-                StopReason::HandleWasDropped,
-            ));
+            return Err(StopReason::HandleWasDropped.into());
         };
 
         handle.deref().notify(request_builder).await
@@ -212,7 +208,7 @@ where
 
         let running_state = lock
             .running_state()
-            .map_err(|stop_reason| crate::CallError::RoutineIsStopped(stop_reason.clone()))?;
+            .map_err(|stop_reason| stop_reason.clone())?;
 
         let request_id = running_state
             .register_new_call_request(response_sender)
@@ -225,11 +221,8 @@ where
         match running_state.write_frame(request).await {
             Ok(()) => {}
             Err(write_error) => {
-                lock.stop_with(StopReason::StreamWriteError {
-                    details: write_error.to_string(),
-                })
-                .await;
-                return Err(crate::CallError::FailedToWriteFrame(write_error));
+                lock.stop_with(write_error.clone().into()).await;
+                return Err(write_error.into());
             }
         }
 
@@ -240,7 +233,7 @@ where
         response_receiver.await.expect(
             "stop_with() method sends a message to the receiver before dropping it, so this should \
              never fail",
-        ).map_err(crate::CallError::RoutineIsStopped)
+        ).map_err(Into::into)
     }
 
     /// # Cancel safety
@@ -260,16 +253,13 @@ where
 
         let running_state = lock
             .running_state()
-            .map_err(|stop_reason| crate::NotifyError::RoutineIsStopped(stop_reason.clone()))?;
+            .map_err(|stop_reason| stop_reason.clone())?;
 
         match running_state.write_frame(request).await {
             Ok(()) => Ok(()),
             Err(write_error) => {
-                lock.stop_with(StopReason::StreamWriteError {
-                    details: write_error.to_string(),
-                })
-                .await;
-                Err(crate::NotifyError::FailedToWriteFrame(write_error))
+                lock.stop_with(write_error.clone().into()).await;
+                Err(write_error.into())
             }
         }
     }

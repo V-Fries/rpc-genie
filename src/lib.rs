@@ -29,23 +29,23 @@ use crate::{
 #[derive(Debug, thiserror::Error)]
 pub enum CallError {
     #[error("Stream handler routine is stopped")]
-    RoutineIsStopped(#[source] stream_handler::StopReason),
+    RoutineIsStopped(#[from] stream_handler::StopReason),
     #[error("Failed to write frame")]
-    FailedToWriteFrame(#[source] frame::WriteError),
+    FailedToWriteFrame(#[from] frame::WriteError),
     #[error("Method not found")]
     MethodNotFound,
-    #[error("Failed to deserialize args: {details}")]
-    FailedToDeserializeArg { details: String },
-    #[error("Failed to deserialize response: {details}")]
-    FailedToDeserializeResponse { details: String },
+    #[error("Failed to deserialize args: {deserialize_error}")]
+    FailedToDeserializeArg { deserialize_error: String },
+    #[error("Failed to deserialize response: {deserialize_error}")]
+    FailedToDeserializeResponse { deserialize_error: String },
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum NotifyError {
     #[error("Stream handler routine is stopped")]
-    RoutineIsStopped(#[source] stream_handler::StopReason),
+    RoutineIsStopped(#[from] stream_handler::StopReason),
     #[error("Failed to write frame")]
-    FailedToWriteFrame(#[source] frame::WriteError),
+    FailedToWriteFrame(#[from] frame::WriteError),
 }
 
 #[doc(hidden)]
