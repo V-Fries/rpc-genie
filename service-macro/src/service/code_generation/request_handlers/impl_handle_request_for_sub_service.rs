@@ -5,19 +5,23 @@ use crate::service::{SubService, code_generation::utils::ident_to_lit_str};
 
 pub fn impl_handle_request_for_sub_service(
     associated_sub_service_struct_name: &TokenStream,
-    opposite_stub_struct_name: &TokenStream,
+    generic_opposite_stub_struct_name: &TokenStream,
     sub_services: &[SubService],
 ) -> TokenStream {
     let fn_content = fn_content(sub_services);
 
     quote! {
-        impl<RequestSender: rpc_genie::send_request::SendRequest> rpc_genie::HandleRequest<#opposite_stub_struct_name<RequestSender>>
+        impl<RequestSender>
+            rpc_genie::HandleRequest<#generic_opposite_stub_struct_name<RequestSender>>
             for #associated_sub_service_struct_name
+        where
+            RequestSender: Send + Sync,
         {
             async fn handle_request(
                 &self,
                 method_path: &str,
-                __rpc_stub__: #opposite_stub_struct_name<RequestSender>,
+                __rpc_opposite_stub_weak_handle__:
+                    &std::sync::Arc<#generic_opposite_stub_struct_name<RequestSender>>,
                 __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
             ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
                 rpc_genie::frame::rpc_response::builder::Uninit,
@@ -46,7 +50,7 @@ fn fn_content(sub_services: &[SubService]) -> TokenStream {
                 self.#name
                     .handle_request(
                         method_path,
-                        __rpc_stub__.#name,
+                        &__rpc_opposite_stub_weak_handle__.#name,
                         __rpc_request_arg_reader__,
                     )
                     .await

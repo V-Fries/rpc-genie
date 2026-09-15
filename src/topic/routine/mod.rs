@@ -31,7 +31,7 @@ type RoutineCommandReceiver<Stub> = mpsc::Receiver<RoutineCommand<Stub>>;
 
 pub enum RoutineCommand<Stub> {
     Subscribe {
-        stub: Stub,
+        stub: Arc<Stub>,
         confirmation_sender: oneshot::Sender<()>,
     },
     Unsubscribe {
@@ -96,7 +96,7 @@ where
         }
     }
 
-    async fn handle_stub_subscribed(&mut self, stub: Stub) {
+    async fn handle_stub_subscribed(&mut self, stub: Arc<Stub>) {
         let Some(stream_id) = stub.stream_id() else {
             return;
         };

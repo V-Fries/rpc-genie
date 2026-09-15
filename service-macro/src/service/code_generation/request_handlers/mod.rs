@@ -19,7 +19,7 @@ impl Service {
             quote!(Server),
             quote!(ServerSubServices),
             &self.server_remote_methods,
-            quote!(ClientStub),
+            quote!(GenericClientStub),
             &self.sub_services,
         );
         let client_request_handler = request_handler(
@@ -27,7 +27,7 @@ impl Service {
             quote!(Client),
             quote!(ClientSubServices),
             &self.client_remote_methods,
-            quote!(ServerStub),
+            quote!(GenericServerStub),
             &self.sub_services,
         );
 
@@ -44,7 +44,7 @@ fn request_handler(
     associated_state_struct_name: TokenStream,
     associated_sub_service_struct_name: TokenStream,
     associated_remote_methods: &[RemoteMethod],
-    opposite_stub_struct_name: TokenStream,
+    weak_opposite_stub_struct_name: TokenStream,
     sub_services: &[SubService],
 ) -> TokenStream {
     let request_handler_struct_definition = request_handler_struct_definition(
@@ -57,12 +57,12 @@ fn request_handler(
         &request_handler_struct_name,
         &associated_state_struct_name,
         associated_remote_methods,
-        &opposite_stub_struct_name,
+        &weak_opposite_stub_struct_name,
     );
 
     let impl_handle_request_for_sub_service = impl_handle_request_for_sub_service(
         &associated_sub_service_struct_name,
-        &opposite_stub_struct_name,
+        &weak_opposite_stub_struct_name,
         sub_services,
     );
 

@@ -41,7 +41,7 @@ where
         }
     }
 
-    pub async fn subscribe(&self, stub: Stub) {
+    pub async fn subscribe(&self, stub: Arc<Stub>) {
         let (sender, receiver) = oneshot::channel();
 
         let Ok(()) = self
@@ -78,14 +78,14 @@ where
 
 impl<Stub> Topic<Stub>
 where
-    Stub: Clone + Send + SubscribableStub + 'static,
+    Stub: Send + Sync + SubscribableStub + 'static,
 {
     pub async fn map<Callback, CallbackFuture, FutureOutput>(
         &self,
         callback: Callback,
     ) -> Vec<FutureOutput>
     where
-        Callback: Fn(Stub) -> CallbackFuture + Send + 'static + Clone,
+        Callback: Fn(Arc<Stub>) -> CallbackFuture + Send + 'static + Clone,
         CallbackFuture: Future<Output = FutureOutput> + Send,
         FutureOutput: Send + 'static,
     {
@@ -95,11 +95,10 @@ where
             .await
     }
 
-    pub async fn for_each<Callback, CallbackFuture, FutureOutput>(&self, callback: Callback)
+    pub async fn for_each<Callback, CallbackFuture>(&self, callback: Callback)
     where
-        Callback: Fn(Stub) -> CallbackFuture + Send + 'static + Clone,
-        CallbackFuture: Future<Output = FutureOutput> + Send,
-        FutureOutput: Send + 'static,
+        Callback: Fn(Arc<Stub>) -> CallbackFuture + Send + 'static + Clone,
+        CallbackFuture: Future<Output = ()> + Send,
     {
         let mut join_set = self.spawn_callback_for_each_stub(callback).await;
 
@@ -117,7 +116,7 @@ where
         callback: Callback,
     ) -> JoinSet<FutureOutput>
     where
-        Callback: Fn(Stub) -> CallbackFuture + Send + 'static + Clone,
+        Callback: Fn(Arc<Stub>) -> CallbackFuture + Send + 'static + Clone,
         CallbackFuture: Future<Output = FutureOutput> + Send,
         FutureOutput: Send + 'static,
     {

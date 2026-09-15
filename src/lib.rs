@@ -50,11 +50,11 @@ pub enum NotifyError {
 
 #[doc(hidden)]
 #[allow(async_fn_in_trait)]
-pub trait HandleRequest<Stub>: Sync + Send + 'static {
+pub trait HandleRequest<OppositeStubWeakHandle>: Sync + Send + 'static {
     fn handle_request(
         &self,
         method_path: &str,
-        __rpc_stub__: Stub,
+        __rpc_opposite_stub_weak_handle__: &Arc<OppositeStubWeakHandle>,
         __rpc_request_arg_reader__: RpcRequestArgReader,
     ) -> impl Future<
         Output = RpcResponseBuilder<
