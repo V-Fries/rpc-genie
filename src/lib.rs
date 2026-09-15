@@ -84,13 +84,17 @@ pub trait State: Send + Sync + 'static {}
 ///
 /// It is used to identify a struct as a Client to check at compile time that you don't pass a
 /// client state to a function that expects a server state.
-pub trait Client: State {}
+pub trait Client<const MAX_FRAME_SIZE: usize, Stream>: State {
+    type ServerStubArcHandle;
+}
 
 /// Every Server structs in rpc-genie services will automatically implement this trait.
 ///
 /// It is used to identify a struct as a Server to check at compile time that you don't pass a
 /// server state to a function that expects a client state.
-pub trait Server: State {}
+pub trait Server<const MAX_FRAME_SIZE: usize, Stream>: State {
+    type ClientStubArcHandle;
+}
 
 #[doc(hidden)]
 pub trait Stub<RequestSender>
