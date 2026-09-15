@@ -124,7 +124,7 @@ where
         let response_builder = request_handler
             .handle_request(
                 &request.method_path,
-                Stub::new(handle.clone()),
+                Stub::new(handle.clone(), None),
                 request_arg_reader,
             )
             .await;

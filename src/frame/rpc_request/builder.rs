@@ -44,10 +44,10 @@ impl<MethodPath> RpcRequestBuilder<Uninit, MethodPath> {
 impl<RpcResponseMode> RpcRequestBuilder<RpcResponseMode, Uninit> {
     pub fn method_path(
         self,
-        method: impl Into<String>,
+        method_path: impl Into<String>,
     ) -> RpcRequestBuilder<RpcResponseMode, String> {
         RpcRequestBuilder {
-            method_path: method.into(),
+            method_path: method_path.into(),
             args: self.args,
             response_mode: self.response_mode,
         }
@@ -62,8 +62,8 @@ impl<RpcResponseMode, MethodPath> RpcRequestBuilder<RpcResponseMode, MethodPath>
     ///
     /// # Panic
     /// This function will panic if param is not serializable using MessagePack
-    pub fn add_param(mut self, param: &impl serde::Serialize) -> Self {
-        let serialized_param = rmp_serde::to_vec_named(param).expect("Failed to serialize param");
+    pub fn add_param<T: serde::Serialize>(mut self, param: T) -> Self {
+        let serialized_param = rmp_serde::to_vec_named(&param).expect("Failed to serialize param");
 
         self.args.extend(serialized_param);
         self
