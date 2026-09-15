@@ -14,6 +14,8 @@ pub use topic::Topic;
 #[doc(hidden)]
 pub mod frame;
 
+mod server;
+
 use std::sync::Arc;
 
 pub use service_macro::service;
