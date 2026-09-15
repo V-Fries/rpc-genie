@@ -98,7 +98,7 @@ where
     Self: Clone + Send + 'static + Sync,
     RequestSender: send_request::SendRequest,
 {
-    fn new(request_sender: RequestSender) -> Self;
+    fn new(request_sender: RequestSender, service_path: Option<String>) -> Self;
 }
 
 #[doc(hidden)]

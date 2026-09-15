@@ -23,7 +23,7 @@ type TestHandle = super::Handle<MAX_FRAME_SIZE, TestStream>;
 struct TestStub;
 
 impl Stub<Weak<TestHandle>> for TestStub {
-    fn new(_request_sender: Weak<TestHandle>) -> Self {
+    fn new(_request_sender: Weak<TestHandle>, _service_path: Option<String>) -> Self {
         Self
     }
 }

@@ -1,8 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::ReturnType;
+use syn::{LitStr, ReturnType};
 
-use crate::service::{RemoteMethod, Service, SubService};
+use crate::service::{RemoteMethod, Service, SubService, code_generation::utils::ident_to_lit_str};
 
 impl Service {
     pub fn stubs(&self) -> TokenStream {
@@ -31,6 +31,7 @@ impl Service {
             pub struct #stub_struct_name<RequestSender> {
                 __rpc_genie_request_sender__: RequestSender,
                 #struct_fields
+                __rpc_service_path__: Option<String>,
             }
 
             #impl_stub_trait
@@ -66,8 +67,18 @@ impl Service {
                  colon,
                  path,
              }| {
+                let str_to_add_to_service_path = LitStr::new(&format!("{name}/"), name.span());
+
                 quote! {
-                    #name #colon #path::#stub_struct_name::<RequestSender>::new(request_sender.clone())
+                    #name #colon #path::#stub_struct_name::<RequestSender>::new(
+                        request_sender.clone(),
+                        Some(match service_path {
+                            Some(ref service_path) => {
+                                service_path.to_owned() + #str_to_add_to_service_path
+                            }
+                            None => #str_to_add_to_service_path.to_owned(),
+                        })
+                    )
                 }
             },
         );
@@ -77,10 +88,11 @@ impl Service {
             where
                 RequestSender: rpc_genie::send_request::SendRequest,
             {
-                fn new(request_sender: RequestSender) -> Self {
+                fn new(request_sender: RequestSender, service_path: Option<String>) -> Self {
                     Self {
                         #(#field_constructor,)*
                         __rpc_genie_request_sender__: request_sender,
+                        __rpc_service_path__: service_path,
                     }
                 }
             }
@@ -114,24 +126,36 @@ fn remote_method_caller(
     }: &RemoteMethod,
 ) -> TokenStream {
     let output = match output {
-        ReturnType::Default => quote!(-> rpc_genie::SingleRequestSender<()>),
+        ReturnType::Default => quote!(-> rpc_genie::SingleRequestSender<RequestSender, ()>),
         ReturnType::Type(arrow, type_ast) => {
-            quote!(#arrow rpc_genie::SingleRequestSender<#type_ast>)
+            quote!(#arrow rpc_genie::SingleRequestSender<RequestSender, #type_ast>)
         }
     };
 
-    // TODO remove this once we finish generating the actual fn content (maybe next PR?)
-    let remove_unused_var_warning = args.iter().map(|arg| {
+    let add_params = args.iter().map(|arg| {
+        let ty = &arg.ty;
         let pat = &arg.pat;
-        quote!(let _ = #pat;)
+        quote!(.add_param::<#ty>(#pat))
     });
+
+    let method_name_as_lit_str = ident_to_lit_str(ident);
 
     quote! {
         #vis fn #ident(&self, #(#args,)*) #output {
-            // TODO remove this once we finish generating the actual fn content (maybe next PR?)
-            #(#remove_unused_var_warning)*
-
-            todo!("Send the request to server and receive the response")
+            rpc_genie::SingleRequestSender::new(
+                self.__rpc_genie_request_sender__.clone(),
+                rpc_genie::frame::rpc_request::RpcRequest::builder()
+                    // No need to add "/" as it already present at the end of the path
+                    .method_path(
+                        match self.__rpc_service_path__ {
+                            Some(ref service_path) => {
+                                service_path.to_owned() + #method_name_as_lit_str
+                            }
+                            None => #method_name_as_lit_str.to_owned(),
+                        }
+                    )
+                    #(#add_params)*,
+            )
         }
     }
 }
