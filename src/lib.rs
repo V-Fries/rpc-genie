@@ -14,6 +14,7 @@ pub use topic::Topic;
 #[doc(hidden)]
 pub mod frame;
 
+mod client;
 mod server;
 
 use std::sync::Arc;
