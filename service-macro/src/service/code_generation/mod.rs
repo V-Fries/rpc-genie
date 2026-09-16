@@ -66,7 +66,8 @@ impl Service {
                                        fields,
                                        semi_token,
                                    }: &ItemStruct,
-                                   trait_to_implement| {
+                                   trait_to_implement,
+                                   opposite_stub_type_name| {
             let fields_iter = fields.iter();
 
             let sub_services_fields = self.sub_services.iter().map(
@@ -94,12 +95,26 @@ impl Service {
                 }#semi_token
 
                 impl rpc_genie::State for #ident {}
-                impl #trait_to_implement for #ident {}
+                impl<const MAX_FRAME_SIZE: usize, Stream>
+                    #trait_to_implement<MAX_FRAME_SIZE, Stream>
+                    for #ident
+                {
+                    type #opposite_stub_type_name =
+                        #opposite_stub_type_name<MAX_FRAME_SIZE, Stream>;
+                }
             }
         };
 
-        let server_state = create_final_struct(&self.server, quote!(rpc_genie::Server));
-        let client_state = create_final_struct(&self.client, quote!(rpc_genie::Client));
+        let server_state = create_final_struct(
+            &self.server,
+            quote!(rpc_genie::Server),
+            quote!(ClientStubArcHandle),
+        );
+        let client_state = create_final_struct(
+            &self.client,
+            quote!(rpc_genie::Client),
+            quote!(ServerStubArcHandle),
+        );
 
         quote! {
             #server_state
