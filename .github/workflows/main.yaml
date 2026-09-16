@@ -11,6 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Clippy
         run: cargo clippy -- -D warnings
 
@@ -18,6 +22,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
       - name: Run tests
         run: RUST_BACKTRACE=1 cargo test --all -- --no-capture
 
