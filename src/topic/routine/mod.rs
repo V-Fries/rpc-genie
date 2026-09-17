@@ -7,10 +7,7 @@ use stub_death_notification_receiver_tasks::{
     StubDeathNotificationReceiverTasks, StubDiedNotificationReceiver,
 };
 
-use std::sync::{
-    Arc,
-    atomic::{self, AtomicU64},
-};
+use std::sync::Arc;
 
 use tokio::sync::{RwLock, mpsc, oneshot};
 
@@ -49,8 +46,7 @@ where
         RoutineCommandSender<Stub>,
         Arc<RwLock<SubscribedStubs<Stub>>>,
     ) {
-        static NEXT_TOPIC_ID: AtomicU64 = AtomicU64::new(0);
-        let id = TopicId(NEXT_TOPIC_ID.fetch_add(1, atomic::Ordering::Relaxed));
+        let id = TopicId::next();
 
         let subscribed_stubs = Arc::new(RwLock::new(SubscribedStubs::new(id)));
 

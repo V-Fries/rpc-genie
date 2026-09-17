@@ -1,3 +1,6 @@
+mod topic_id;
+pub use topic_id::TopicId;
+
 mod routine;
 pub use routine::StubDiedNotificationSender;
 
@@ -23,9 +26,6 @@ where
     subscribed_stubs: Arc<RwLock<SubscribedStubs<Stub>>>,
     routine_command_sender: RoutineCommandSender<Stub>,
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct TopicId(u64);
 
 impl<Stub> Topic<Stub>
 where
