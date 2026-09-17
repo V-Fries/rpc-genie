@@ -1,3 +1,3 @@
 pub trait Stream<Addr>: Sized {
-    async fn connect(addr: &Addr) -> Result<Self, std::io::Error>;
+    fn connect(addr: &Addr) -> impl Future<Output = Result<Self, std::io::Error>>;
 }

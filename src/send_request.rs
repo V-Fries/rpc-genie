@@ -3,15 +3,14 @@ use crate::frame::{
     rpc_response::RpcResponse,
 };
 
-#[allow(async_fn_in_trait)]
 pub trait SendRequest: Clone + Send + Sync + 'static {
-    async fn call(
+    fn call(
         &self,
         request_builder: RpcRequestBuilder<RpcRequestBuilderUninit, String>,
-    ) -> Result<RpcResponse, crate::CallError>;
+    ) -> impl Future<Output = Result<RpcResponse, crate::CallError>> + Send;
 
-    async fn notify(
+    fn notify(
         &self,
         request_builder: RpcRequestBuilder<RpcRequestBuilderUninit, String>,
-    ) -> Result<(), crate::NotifyError>;
+    ) -> impl Future<Output = Result<(), crate::NotifyError>> + Send;
 }
