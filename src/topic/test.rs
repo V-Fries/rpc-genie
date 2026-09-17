@@ -136,10 +136,9 @@ async fn duplicate_stream_is_subscribed_only_once() {
 async fn unsubscribe_removes_registration_and_stub() {
     let topic = Topic::new().await;
     let stub = TestStub::new();
-    let stream_id = stub.stream_id();
 
     topic.subscribe(stub.clone()).await;
-    topic.unsubscribe(stream_id).await;
+    topic.unsubscribe(&stub).await;
 
     assert!(topic.map(|_| async {}).await.is_empty());
     assert_eq!(stub.registered_topic_count(), 0);
@@ -241,16 +240,6 @@ async fn subscribe_stub_with_no_stream_id_is_noop() {
 }
 
 #[tokio::test]
-async fn unsubscribe_nonexistent_stream_id_is_noop() {
-    let topic: Topic<TestStub> = Topic::new().await;
-    let fake_id = StreamId::next();
-
-    topic.unsubscribe(fake_id).await;
-
-    assert!(topic.map(|_| async {}).await.is_empty());
-}
-
-#[tokio::test]
 async fn stub_subscribed_to_multiple_topics_dies_removes_from_all() {
     let topic_a = Topic::new().await;
     let topic_b = Topic::new().await;
@@ -270,12 +259,11 @@ async fn stub_subscribed_to_multiple_topics_dies_removes_from_all() {
 async fn unsubscribe_then_resubscribe_same_stub() {
     let topic = Topic::new().await;
     let stub = TestStub::new();
-    let stream_id = stub.stream_id();
 
     topic.subscribe(stub.clone()).await;
     assert_eq!(topic.map(|_| async {}).await.len(), 1);
 
-    topic.unsubscribe(stream_id).await;
+    topic.unsubscribe(&stub).await;
     assert!(topic.map(|_| async {}).await.is_empty());
     assert_eq!(stub.registered_topic_count(), 0);
 

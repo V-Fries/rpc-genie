@@ -10,7 +10,6 @@ use tokio::{
 
 use crate::{
     SubscribableStub,
-    stream_handler::StreamId,
     topic::routine::{Routine, RoutineCommand, RoutineCommandSender, SubscribedStubs},
 };
 
@@ -58,7 +57,12 @@ where
         let _ = receiver.await;
     }
 
-    pub async fn unsubscribe(&self, stream_id: StreamId) {
+    pub async fn unsubscribe(&self, stub: &Arc<Stub>) {
+        let Some(stream_id) = stub.stream_id() else {
+            // stub is already dead so we don't subscribe
+            return;
+        };
+
         let (sender, receiver) = oneshot::channel();
 
         let Ok(()) = self
