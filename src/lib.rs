@@ -6,6 +6,7 @@ pub mod stream_handler;
 
 #[doc(hidden)]
 pub mod send_request;
+pub use send_request::SendRequest;
 
 #[doc(hidden)]
 pub mod topic;
@@ -14,8 +15,8 @@ pub use topic::Topic;
 #[doc(hidden)]
 pub mod frame;
 
-mod client;
-mod server;
+pub mod client;
+pub mod server;
 
 use std::sync::Arc;
 
