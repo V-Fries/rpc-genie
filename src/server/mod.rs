@@ -62,23 +62,22 @@ where
 
 impl<Stub> ServerHandle<Stub>
 where
-    Stub: Send + Sync + SubscribableStub + 'static,
+    Stub: SubscribableStub,
 {
-    pub async fn map_each_client<Callback, CallbackFuture, FutureOutput>(
+    pub async fn map_each_client<CallbackFuture, FutureOutput>(
         &self,
-        callback: Callback,
+        callback: impl FnMut(Arc<Stub>) -> CallbackFuture,
     ) -> Vec<FutureOutput>
     where
-        Callback: Fn(Arc<Stub>) -> CallbackFuture + Send + 'static + Clone,
-        CallbackFuture: Future<Output = FutureOutput> + Send,
-        FutureOutput: Send + 'static,
+        CallbackFuture: Future<Output = FutureOutput>,
     {
         self.topic.map(callback).await
     }
 
-    pub async fn for_each_client<Callback, CallbackFuture>(&self, callback: Callback)
-    where
-        Callback: Fn(Arc<Stub>) -> CallbackFuture + Send + 'static + Clone,
+    pub async fn for_each_client<CallbackFuture>(
+        &self,
+        callback: impl FnMut(Arc<Stub>) -> CallbackFuture,
+    ) where
         CallbackFuture: Future<Output = ()> + Send,
     {
         self.topic.for_each(callback).await
