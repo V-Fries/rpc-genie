@@ -1,16 +1,17 @@
+mod topic_id;
+pub use topic_id::TopicId;
+
 mod routine;
 pub use routine::StubDiedNotificationSender;
 
-use std::{panic, sync::Arc};
+use futures::{StreamExt, stream::FuturesUnordered};
 
-use tokio::{
-    sync::{RwLock, oneshot},
-    task::JoinSet,
-};
+use std::sync::Arc;
+
+use tokio::sync::{RwLock, oneshot};
 
 use crate::{
     SubscribableStub,
-    stream_handler::StreamId,
     topic::routine::{Routine, RoutineCommand, RoutineCommandSender, SubscribedStubs},
 };
 
@@ -24,9 +25,6 @@ where
     subscribed_stubs: Arc<RwLock<SubscribedStubs<Stub>>>,
     routine_command_sender: RoutineCommandSender<Stub>,
 }
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct TopicId(u64);
 
 impl<Stub> Topic<Stub>
 where
@@ -58,7 +56,12 @@ where
         let _ = receiver.await;
     }
 
-    pub async fn unsubscribe(&self, stream_id: StreamId) {
+    pub async fn unsubscribe(&self, stub: &Arc<Stub>) {
+        let Some(stream_id) = stub.stream_id() else {
+            // stub is already dead so we don't subscribe
+            return;
+        };
+
         let (sender, receiver) = oneshot::channel();
 
         let Ok(()) = self
@@ -78,57 +81,44 @@ where
 
 impl<Stub> Topic<Stub>
 where
-    Stub: Send + Sync + SubscribableStub + 'static,
+    Stub: SubscribableStub,
 {
-    pub async fn map<Callback, CallbackFuture, FutureOutput>(
+    pub async fn map<CallbackFuture, FutureOutput>(
         &self,
-        callback: Callback,
+        mut callback: impl FnMut(Arc<Stub>) -> CallbackFuture,
     ) -> Vec<FutureOutput>
     where
-        Callback: Fn(Arc<Stub>) -> CallbackFuture + Send + 'static + Clone,
-        CallbackFuture: Future<Output = FutureOutput> + Send,
-        FutureOutput: Send + 'static,
+        CallbackFuture: Future<Output = FutureOutput>,
     {
-        self.spawn_callback_for_each_stub(callback)
+        self.spawn_callback_for_each_stub(&mut callback)
             .await
-            .join_all()
+            .collect()
             .await
     }
 
-    pub async fn for_each<Callback, CallbackFuture>(&self, callback: Callback)
-    where
-        Callback: Fn(Arc<Stub>) -> CallbackFuture + Send + 'static + Clone,
-        CallbackFuture: Future<Output = ()> + Send,
-    {
-        let mut join_set = self.spawn_callback_for_each_stub(callback).await;
-
-        while let Some(res) = join_set.join_next().await {
-            match res {
-                Ok(_) => {}
-                Err(err) if err.is_panic() => panic::resume_unwind(err.into_panic()),
-                Err(err) => panic!("{err}"),
-            }
-        }
-    }
-
-    async fn spawn_callback_for_each_stub<Callback, CallbackFuture, FutureOutput>(
+    pub async fn for_each<CallbackFuture>(
         &self,
-        callback: Callback,
-    ) -> JoinSet<FutureOutput>
-    where
-        Callback: Fn(Arc<Stub>) -> CallbackFuture + Send + 'static + Clone,
-        CallbackFuture: Future<Output = FutureOutput> + Send,
-        FutureOutput: Send + 'static,
+        mut callback: impl FnMut(Arc<Stub>) -> CallbackFuture,
+    ) where
+        CallbackFuture: Future<Output = ()>,
     {
-        let mut join_set = JoinSet::new();
+        let mut tasks = self.spawn_callback_for_each_stub(&mut callback).await;
+        while let Some(()) = tasks.next().await {}
+    }
 
-        let lock = self.subscribed_stubs.read().await;
-
-        for stub in lock.iter().cloned() {
-            let callback_clone = callback.clone();
-            join_set.spawn(async move { callback_clone(stub).await });
-        }
-
-        join_set
+    async fn spawn_callback_for_each_stub<CallbackFuture, FutureOutput>(
+        &self,
+        callback: &mut impl FnMut(Arc<Stub>) -> CallbackFuture,
+    ) -> FuturesUnordered<CallbackFuture>
+    where
+        CallbackFuture: Future<Output = FutureOutput>,
+    {
+        self.subscribed_stubs
+            .read()
+            .await
+            .iter()
+            .cloned()
+            .map(callback)
+            .collect()
     }
 }
