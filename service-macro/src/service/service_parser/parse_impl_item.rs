@@ -14,76 +14,89 @@ enum ImplForServerOrClient {
 
 pub fn parse_impl_item(
     service: &mut ServiceBuilder,
-    mut impl_item: ItemImpl,
+    mut item_impl: ItemImpl,
     errors: &mut Option<syn::Error>,
 ) {
-    let has_remote_methods_attr = has_remote_methods_attr(&impl_item, errors);
-
-    match is_impl_block_for_server_or_client(&impl_item) {
+    match is_impl_block_for_server_or_client(&item_impl) {
         ImplForServerOrClient::Server => {
-            if has_remote_methods_attr {
-                push_remote_methods_block_methods(
-                    &mut service.server_remote_methods,
-                    &impl_item,
-                    errors,
-                )
-            }
+            push_remote_methods(&mut service.server_remote_methods, &mut item_impl, errors);
         }
         ImplForServerOrClient::Client => {
-            if has_remote_methods_attr {
-                push_remote_methods_block_methods(
-                    &mut service.client_remote_methods,
-                    &impl_item,
-                    errors,
-                )
-            }
+            push_remote_methods(&mut service.client_remote_methods, &mut item_impl, errors);
         }
         ImplForServerOrClient::Neither => {
-            if has_remote_methods_attr {
-                combine_errors(
-                    errors,
-                    syn::Error::new_spanned(
-                        impl_item.clone(),
-                        "Only the Server and Client structs may use the #[remote_methods] attribute",
-                    ),
-                );
-            }
+            check_non_state_struct_impl_for_remote_method_attr(&item_impl, errors)
         }
     }
 
-    impl_item
-        .attrs
-        .retain(|attr| !attr.path().is_ident("remote_methods"));
-    service.rest.push(Item::Impl(impl_item));
+    service.rest.push(Item::Impl(item_impl));
 }
 
-fn has_remote_methods_attr(impl_item: &ItemImpl, errors: &mut Option<syn::Error>) -> bool {
-    let maybe_remote_method_attr = impl_item
+fn push_remote_methods(
+    dst: &mut Vec<RemoteMethod>,
+    item_impl: &mut ItemImpl,
+    errors: &mut Option<syn::Error>,
+) {
+    let mut contains_remote_methods = false;
+
+    for item in item_impl.items.iter_mut() {
+        if let ImplItem::Fn(impl_item_fn) = item
+            && has_remote_method_attr(impl_item_fn, errors)
+        {
+            contains_remote_methods = true;
+
+            match create_remote_method(impl_item_fn) {
+                Err(err) => combine_errors(errors, err),
+                Ok(remote_method) => dst.push(remote_method),
+            }
+
+            impl_item_fn
+                .attrs
+                .retain(|attr| !attr.path().is_ident("remote_method"));
+        }
+    }
+
+    if contains_remote_methods {
+        for attr in item_impl.attrs.iter() {
+            combine_errors(
+                errors,
+                syn::Error::new_spanned(
+                    attr,
+                    "Using an attribute on an impl block which contains methods marked with \
+                     #[remote_method] is not allowed",
+                ),
+            );
+        }
+    }
+}
+
+fn has_remote_method_attr(impl_item_fn: &ImplItemFn, errors: &mut Option<syn::Error>) -> bool {
+    let remote_method_attrs = impl_item_fn
         .attrs
         .iter()
-        .filter(|attr| attr.path().is_ident("remote_methods"))
+        .filter(|attr| attr.path().is_ident("remote_method"))
         .collect::<Vec<_>>();
 
-    match maybe_remote_method_attr.as_slice() {
+    match remote_method_attrs.as_slice() {
         [] => return false,
-        [remote_method_attr] => check_remote_methods_attr_args(remote_method_attr, errors),
+        [remote_method_attr] => check_remote_method_attr_args(remote_method_attr, errors),
         _ => {
             combine_errors(
                 errors,
                 syn::Error::new_spanned(
-                    impl_item,
-                    "#[remote_methods] attribute should only be present once",
+                    impl_item_fn,
+                    "#[remote_method] attribute should only be present once",
                 ),
             );
         }
     };
 
-    if impl_item.attrs.len() != 1 {
+    if impl_item_fn.attrs.len() != remote_method_attrs.len() {
         combine_errors(
             errors,
             syn::Error::new_spanned(
-                impl_item,
-                "When #[remote_methods] attribute is used, other attributes are not allowed",
+                impl_item_fn,
+                "When #[remote_method] attribute is used, other attributes are not allowed",
             ),
         );
     }
@@ -107,46 +120,24 @@ fn is_impl_block_for_server_or_client(impl_item: &ItemImpl) -> ImplForServerOrCl
     }
 }
 
-/// remote_methods attributes should not have any arguments so this returns an error if there are
+/// #[remote_method] attributes should not have any arguments so this returns an error if there are
 /// any
-fn check_remote_methods_attr_args(attr: &Attribute, errors: &mut Option<syn::Error>) {
+fn check_remote_method_attr_args(attr: &Attribute, errors: &mut Option<syn::Error>) {
     match attr.meta {
         syn::Meta::Path(_) => (),
         syn::Meta::List(ref list) => combine_errors(
             errors,
-            syn::Error::new_spanned(list, "#[remote_methods] does not take any arguments"),
+            syn::Error::new_spanned(list, "#[remote_method] does not take any arguments"),
         ),
         syn::Meta::NameValue(ref name_value) => combine_errors(
             errors,
-            syn::Error::new_spanned(name_value, "#[remote_methods] does not take any arguments"),
+            syn::Error::new_spanned(name_value, "#[remote_method] does not take any arguments"),
         ),
-    }
-}
-
-fn push_remote_methods_block_methods(
-    dst: &mut Vec<RemoteMethod>,
-    impl_item: &ItemImpl,
-    errors: &mut Option<syn::Error>,
-) {
-    for item in impl_item.items.iter() {
-        if let ImplItem::Fn(function) = item {
-            match create_remote_method(function) {
-                Err(err) => combine_errors(errors, err),
-                Ok(remote_method) => dst.push(remote_method),
-            }
-        }
     }
 }
 
 fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
     let mut errors = None;
-
-    if !function.attrs.is_empty() {
-        combine_errors(
-            &mut errors,
-            syn::Error::new_spanned(function, "Remote methods are not allowed to use attributes"),
-        );
-    }
 
     let mut remote_method = RemoteMethod {
         vis: function.vis.clone(),
@@ -182,4 +173,34 @@ fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
     }
 
     create_result(remote_method, errors)
+}
+
+fn check_non_state_struct_impl_for_remote_method_attr(
+    item_impl: &ItemImpl,
+    errors: &mut Option<syn::Error>,
+) {
+    for item in item_impl.items.iter() {
+        if let ImplItem::Fn(impl_item_fn) = item {
+            check_non_state_method_for_remote_method_attr(impl_item_fn, errors);
+        }
+    }
+}
+
+fn check_non_state_method_for_remote_method_attr(
+    impl_item_fn: &ImplItemFn,
+    errors: &mut Option<syn::Error>,
+) {
+    for attr in impl_item_fn
+        .attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("remote_method"))
+    {
+        combine_errors(
+            errors,
+            syn::Error::new_spanned(
+                attr,
+                "Only the Server and Client structs may use the #[remote_method] attribute",
+            ),
+        );
+    }
 }

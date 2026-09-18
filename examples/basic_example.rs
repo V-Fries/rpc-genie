@@ -15,27 +15,31 @@ pub mod service_a {
         pub server_name: String,
     }
 
-    #[remote_methods]
     impl Server {
         // pass &self for stateful functions (use mutexes and other solutions for mutability)
+        #[remote_method]
         fn server_name(&self) -> String {
             self.server_name.clone()
         }
 
         // Don't pass &self if you don't need the state
+        #[remote_method]
         fn add(a: u32, b: u32) -> u32 {
             a + b
         }
 
+        #[remote_method]
         fn add_4(a: u32) -> u32 {
             // Self::add() is designated as a remote method, but it can still be called locally:
             Self::add(a, 4)
         }
 
+        #[remote_method]
         fn access_sub_service_state(&self) -> u32 {
             self.sub_service_1.some_state
         }
 
+        #[remote_method]
         fn complicated_pattern_arg((a, (b, c)): (u32, (String, f32))) {
             println!("received: ({a}, ({b}, {c}))");
         }

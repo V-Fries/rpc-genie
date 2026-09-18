@@ -256,15 +256,18 @@ fn error_if_remote_methods_block_has_functions_that_use_attributes() {
         mod foo {
             struct Server {}
 
-            #[remote_methods]
             impl Server {
                 #[foo]
+                #[remote_method]
                 fn foo() {}
             }
         }
     };
 
-    expect_error!(service, "Remote methods are not allowed to use attributes");
+    expect_error!(
+        service,
+        "When #[remote_method] attribute is used, other attributes are not allowed"
+    );
 }
 
 #[test]
@@ -273,9 +276,9 @@ fn error_if_remote_methods_attr_is_not_the_only_attribute() {
         mod foo {
             struct Server {}
 
-            #[remote_methods]
             #[foo]
             impl Server {
+                #[remote_method]
                 fn foo() {}
             }
         }
@@ -283,7 +286,8 @@ fn error_if_remote_methods_attr_is_not_the_only_attribute() {
 
     expect_error!(
         service,
-        "When #[remote_methods] attribute is used, other attributes are not allowed",
+        "Using an attribute on an impl block which contains methods marked with #[remote_method] \
+         is not allowed",
     );
 }
 
@@ -319,9 +323,9 @@ fn error_if_remote_methods_attr_is_present_multiple_times() {
         mod foo {
             struct Server {}
 
-            #[remote_methods]
-            #[remote_methods]
             impl Server {
+                #[remote_method]
+                #[remote_method]
                 fn foo() {}
             }
         }
@@ -329,7 +333,7 @@ fn error_if_remote_methods_attr_is_present_multiple_times() {
 
     expect_error!(
         service,
-        "#[remote_methods] attribute should only be present once",
+        "#[remote_method] attribute should only be present once",
     );
 }
 
@@ -339,8 +343,8 @@ fn error_if_remote_methods_attr_is_on_an_impl_block_that_is_neither_client_nor_s
         mod foo {
             struct Foo {}
 
-            #[remote_methods]
             impl Foo {
+                #[remote_method]
                 fn foo() {}
             }
         }
@@ -348,7 +352,7 @@ fn error_if_remote_methods_attr_is_on_an_impl_block_that_is_neither_client_nor_s
 
     expect_error!(
         service,
-        "Only the Server and Client structs may use the #[remote_methods] attribute",
+        "Only the Server and Client structs may use the #[remote_method] attribute",
     );
 }
 
@@ -376,19 +380,27 @@ fn error_if_no_module_body() {
 fn error_if_remote_methods_has_arguments() {
     let service = quote! {
         mod foo {
-            #[remote_methods(42)]
-            impl Server {}
+            struct Server {}
+
+            impl Server {
+                #[remote_method(42)]
+                fn foo() {}
+            }
         }
     };
-    expect_error!(service, "#[remote_methods] does not take any arguments");
+    expect_error!(service, "#[remote_method] does not take any arguments");
 
     let service = quote! {
         mod foo {
-            #[remote_methods{name = "foo"}]
-            impl Server {}
+            struct Server {}
+
+            impl Server {
+                #[remote_method{name = "foo"}]
+                fn foo() {}
+            }
         }
     };
-    expect_error!(service, "#[remote_methods] does not take any arguments");
+    expect_error!(service, "#[remote_method] does not take any arguments");
 }
 
 #[test]
@@ -403,8 +415,8 @@ fn with_sub_service() {
                 pub server_name: String,
             }
 
-            #[remote_methods]
             impl Server {
+                #[remote_method]
                 async fn get_server_name(&self) -> String {
                     self.server_name.clone()
                 }
@@ -462,8 +474,8 @@ fn with_client_stub() {
                 pub subscribed_clients: rpc_genie::SubscribedClients<Client>,
             }
 
-            #[remote_methods]
             impl Server {
+                #[remote_method]
                 async fn increment(&self) {
                     let new_value = {
                         let lock = self.count.lock().await;
@@ -475,6 +487,7 @@ fn with_client_stub() {
                     .await
                 }
 
+                #[remote_method]
                 async fn decrement(&self) {
                     let new_value = {
                         let lock = self.count.lock().await;
@@ -487,10 +500,12 @@ fn with_client_stub() {
                     .await
                 }
 
+                #[remote_method]
                 async fn get(&self) -> u32 {
                     *self.count.lock().await
                 }
 
+                #[remote_method]
                 async fn subscribe(&self, client: rpc_genie::ClientStub<Client>) {
                     let count_lock = self.count.lock().await;
                     client.change_event(count_lock).await;
@@ -502,8 +517,8 @@ fn with_client_stub() {
                 pub current_count: tokio::sync::Mutex<u32>,
             }
 
-            #[remote_methods]
             impl Client {
+                #[remote_method]
                 async fn change_event(&self, new_value: u32) {
                     *self.current_count.lock().await = new_value;
                 }
