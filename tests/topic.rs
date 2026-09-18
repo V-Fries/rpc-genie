@@ -48,3 +48,80 @@ mod counter {
         }
     }
 }
+
+#[tokio::test]
+async fn counter_test() {
+    use std::{
+        sync::{
+            Arc,
+            atomic::{self, AtomicU64},
+        },
+        time::Duration,
+    };
+    use tokio::time::{sleep, timeout};
+
+    let server_handle = rpc_genie::Tcp::<1024>::start_server(
+        "127.0.0.1:51235",
+        Arc::new(counter::Server {
+            count: AtomicU64::new(0),
+            topic: rpc_genie::Topic::new().await,
+        }),
+    )
+    .await
+    .unwrap();
+
+    let client_handle = timeout(Duration::from_secs(1), async {
+        loop {
+            if let Ok(client_handle) = rpc_genie::Tcp::<1024>::connect_client(
+                "127.0.0.1:51235",
+                Arc::new(counter::Client {
+                    count: AtomicU64::new(0),
+                    _request_sender: std::marker::PhantomData,
+                }),
+            )
+            .await
+            {
+                return client_handle;
+            }
+        }
+    })
+    .await
+    .expect("client failed to connect to server");
+
+    client_handle.server_stub.subscribe().call().await.unwrap();
+    client_handle.server_stub.increment().call().await.unwrap();
+
+    timeout(Duration::from_secs(1), async {
+        loop {
+            if client_handle.state.count.load(atomic::Ordering::Relaxed) == 1 {
+                return;
+            }
+        }
+    })
+    .await
+    .expect("client never received the new count");
+
+    client_handle
+        .server_stub
+        .unsubscribe()
+        .call()
+        .await
+        .unwrap();
+    client_handle.server_stub.increment().call().await.unwrap();
+    sleep(Duration::from_secs(1)).await;
+    // since we unsubscribed, we shouldn't have received the update
+    assert_eq!(client_handle.state.count.load(atomic::Ordering::Relaxed), 1);
+
+    client_handle.server_stub.subscribe().call().await.unwrap();
+    timeout(Duration::from_secs(1), async {
+        loop {
+            if client_handle.state.count.load(atomic::Ordering::Relaxed) == 2 {
+                return;
+            }
+        }
+    })
+    .await
+    .expect("client never received the new count");
+
+    server_handle.stop();
+}
