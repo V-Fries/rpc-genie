@@ -127,7 +127,8 @@ async fn stop_resolves_pending_call() {
     let (stub, mut client_reader, _client_writer) = start_test_routine().await;
     let stub_clone = stub.clone();
     let call_task = tokio::spawn(async move {
-        stub_clone.call(crate::frame::rpc_request::RpcRequest::builder().method_path("echo"))
+        stub_clone
+            .call(crate::frame::rpc_request::RpcRequest::builder().method_path("echo"))
             .await
     });
 
