@@ -83,23 +83,31 @@ mod service_b {
 
 #[tokio::test]
 async fn test() {
-    let (client_tests_finished_sender, client_tests_finished_receiver) =
+    let (client_disconnected_sender, client_disconnected_receiver) =
         tokio::sync::oneshot::channel();
-    let (server_tests_finished_sender, server_tests_finished_receiver) =
+    let (server_doesnt_need_client_anymore_sender, server_doesnt_need_client_anymore_receiver) =
         tokio::sync::oneshot::channel();
 
     let server_join_handle = tokio::spawn(async move {
-        server(client_tests_finished_receiver, server_tests_finished_sender).await
+        server(
+            client_disconnected_receiver,
+            server_doesnt_need_client_anymore_sender,
+        )
+        .await
     });
 
-    client(client_tests_finished_sender, server_tests_finished_receiver).await;
+    client(
+        client_disconnected_sender,
+        server_doesnt_need_client_anymore_receiver,
+    )
+    .await;
 
     server_join_handle.await.unwrap();
 }
 
 async fn server(
-    client_tests_finished_receiver: tokio::sync::oneshot::Receiver<()>,
-    server_tests_finished_sender: tokio::sync::oneshot::Sender<()>,
+    client_disconnected_receiver: tokio::sync::oneshot::Receiver<()>,
+    server_doesnt_need_client_anymore_sender: tokio::sync::oneshot::Sender<()>,
 ) {
     use std::sync::Arc;
 
@@ -148,14 +156,27 @@ async fn server(
             .await
     );
 
-    server_tests_finished_sender.send(()).unwrap();
-    client_tests_finished_receiver.await.unwrap();
+    server_doesnt_need_client_anymore_sender.send(()).unwrap();
+    client_disconnected_receiver.await.unwrap();
+
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        loop {
+            if server_handle.map_each_client(|_| async {}).await.len() == 0 {
+                break;
+            }
+
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("client was not removed from topic");
+
     server_handle.stop();
 }
 
 async fn client(
-    client_tests_finished_sender: tokio::sync::oneshot::Sender<()>,
-    server_tests_finished_receiver: tokio::sync::oneshot::Receiver<()>,
+    client_disconnected_sender: tokio::sync::oneshot::Sender<()>,
+    server_doesnt_need_client_anymore_receiver: tokio::sync::oneshot::Receiver<()>,
 ) {
     use std::sync::{Arc, atomic::AtomicU32};
 
@@ -230,6 +251,8 @@ async fn client(
         .await
         .unwrap();
 
-    client_tests_finished_sender.send(()).unwrap();
-    server_tests_finished_receiver.await.unwrap();
+    server_doesnt_need_client_anymore_receiver.await.unwrap();
+
+    client_handle.disconnect();
+    client_disconnected_sender.send(()).unwrap();
 }

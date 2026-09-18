@@ -1,6 +1,3 @@
-// TODO remove this
-#![allow(dead_code)]
-
 mod listener;
 pub use listener::Listener;
 
@@ -190,17 +187,18 @@ pub async fn server_routine<
             return;
         };
 
+        let weak_topic = Arc::downgrade(&topic);
         topic
-            .subscribe(Arc::new(ClientStubArcHandle::new(
-                stream_handler::spawn_routine::<
+            .subscribe(
+                stream_handler::spawn_server_routine::<
                     MAX_FRAME_SIZE,
                     Stream,
                     RequestHandler,
+                    ClientStubArcHandle,
                     ClientStubWeakHandle,
-                >(client_stream, client_id, request_handler_clone)
+                >(client_stream, client_id, request_handler_clone, weak_topic)
                 .await,
-                None,
-            )))
+            )
             .await
     }
 }
