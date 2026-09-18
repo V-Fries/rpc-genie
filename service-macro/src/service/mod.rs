@@ -17,6 +17,7 @@ pub struct Service {
 
 struct RemoteMethod {
     vis: Visibility,
+    is_async: bool,
     ident: Ident,
     receiver: Option<Receiver>,
     args: Vec<PatType>,

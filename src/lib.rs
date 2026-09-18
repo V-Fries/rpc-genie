@@ -88,7 +88,7 @@ pub trait State: Send + Sync + 'static {}
 ///
 /// It is used to identify a struct as a Client to check at compile time that you don't pass a
 /// client state to a function that expects a server state.
-pub trait Client<const MAX_FRAME_SIZE: usize, Stream>: State {
+pub trait Client<const MAX_FRAME_SIZE: usize, Stream, ServerStubWeakHandle>: State {
     type ServerStubArcHandle;
 }
 
@@ -96,7 +96,7 @@ pub trait Client<const MAX_FRAME_SIZE: usize, Stream>: State {
 ///
 /// It is used to identify a struct as a Server to check at compile time that you don't pass a
 /// server state to a function that expects a client state.
-pub trait Server<const MAX_FRAME_SIZE: usize, Stream>: State {
+pub trait Server<const MAX_FRAME_SIZE: usize, Stream, ClientStubWeakHandle>: State {
     type ClientStubArcHandle;
 }
 

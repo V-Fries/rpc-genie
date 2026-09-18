@@ -102,8 +102,12 @@ where
     Listener: listener::Listener<Addr, Stream>,
     Addr: Into<String>,
     Stream: AsyncWrite + AsyncRead + Send + 'static,
-    Server: crate::Server<MAX_FRAME_SIZE, Stream, ClientStubArcHandle = ClientStubArcHandle>
-        + IntoRequestHandler<RequestHandler, SubServices>,
+    Server: crate::Server<
+            MAX_FRAME_SIZE,
+            Stream,
+            Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>,
+            ClientStubArcHandle = ClientStubArcHandle,
+        > + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ClientStubWeakHandle>,
     ClientStubArcHandle:
         crate::Stub<Arc<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>> + SubscribableStub,
@@ -158,8 +162,12 @@ pub async fn server_routine<
     topic: Weak<Topic<ClientStubArcHandle>>,
 ) where
     Listener: listener::Listener<Addr, Stream>,
-    Server: crate::Server<MAX_FRAME_SIZE, Stream, ClientStubArcHandle = ClientStubArcHandle>
-        + IntoRequestHandler<RequestHandler, SubServices>,
+    Server: crate::Server<
+            MAX_FRAME_SIZE,
+            Stream,
+            Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>,
+            ClientStubArcHandle = ClientStubArcHandle,
+        > + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ClientStubWeakHandle>,
     ClientStubArcHandle:
         crate::Stub<Arc<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>> + SubscribableStub,

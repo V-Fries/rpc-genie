@@ -1,5 +1,8 @@
+use std::ops::Deref;
+
 use proc_macro2::TokenStream;
 use quote::quote;
+use syn::Type;
 
 use crate::service::{RemoteMethod, code_generation::utils::ident_to_lit_str};
 
@@ -8,15 +11,20 @@ pub fn impl_handle_request_for_request_handler(
     associated_state_struct_name: &TokenStream,
     associated_remote_methods: &[RemoteMethod],
     generic_opposite_stub_struct_name: &TokenStream,
+    opposite_stub_alias: &str,
 ) -> TokenStream {
-    let fn_content = fn_content(associated_state_struct_name, associated_remote_methods);
+    let fn_content = fn_content(
+        associated_state_struct_name,
+        associated_remote_methods,
+        opposite_stub_alias,
+    );
 
     quote! {
         impl<RequestSender>
             rpc_genie::HandleRequest<#generic_opposite_stub_struct_name<RequestSender>>
-            for #request_handler_struct_name
+            for #request_handler_struct_name<RequestSender>
         where
-            RequestSender: Send + Sync,
+            RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
         {
             async fn handle_request(
                 &self,
@@ -37,6 +45,7 @@ pub fn impl_handle_request_for_request_handler(
 fn fn_content(
     associated_state_struct_name: &TokenStream,
     remote_methods: &[RemoteMethod],
+    opposite_stub_alias: &str,
 ) -> TokenStream {
     let sub_services_handle_request_call = quote! {
         self.sub_services
@@ -52,9 +61,13 @@ fn fn_content(
         return sub_services_handle_request_call;
     }
 
-    let methods_matches = remote_methods
-        .iter()
-        .map(|remote_method| match_branch(associated_state_struct_name, remote_method));
+    let methods_matches = remote_methods.iter().map(|remote_method| {
+        match_branch(
+            associated_state_struct_name,
+            remote_method,
+            opposite_stub_alias,
+        )
+    });
 
     quote! {
         match method_path {
@@ -69,37 +82,58 @@ fn fn_content(
 fn match_branch(
     associated_state_struct_name: &TokenStream,
     remote_method: &RemoteMethod,
+    opposite_stub_alias: &str,
 ) -> TokenStream {
     let method_name_as_literal_str = ident_to_lit_str(&remote_method.ident);
 
     let code_that_parses_args_into_vars = remote_method.args.iter().map(|arg| {
-        let pat = &arg.pat;
-        let ty = &arg.ty;
-        quote! {
-            let #pat = match __rpc_request_arg_reader__.read_arg::<#ty>() {
-                Ok(arg) => arg,
-                Err(err) => {
-                    return rpc_genie::frame::rpc_response::RpcResponse::builder().error(
-                        rpc_genie::frame::rpc_response::RpcResponseError::FailedToDeserializeArg {
-                            serialize_error: err.to_string(),
+        match arg.ty.deref() {
+            Type::Path(type_path) if type_path.path.is_ident(opposite_stub_alias) => {
+                // No need to deserialize anything as the stub in not included in the request. It
+                // is the handle_request function __rpc_opposite_stub_weak_handle__ argument.
+                quote!()
+            }
+            _ =>  {
+                let pat = &arg.pat;
+                let ty = &arg.ty;
+                quote! {
+                    let #pat = match __rpc_request_arg_reader__.read_arg::<#ty>() {
+                        Ok(arg) => arg,
+                        Err(err) => {
+                            return rpc_genie::frame::rpc_response::RpcResponse::builder().error(
+                                rpc_genie::frame::rpc_response::RpcResponseError::FailedToDeserializeArg {
+                                    serialize_error: err.to_string(),
+                                },
+                            );
                         },
-                    );
-                },
-            };
+                    };
+                }
+            }
         }
     });
 
-    let args_names = remote_method.args.iter().map(|arg| {
-        let pat = &arg.pat;
-        quote!(#pat)
+    let args_names = remote_method.args.iter().map(|arg| match arg.ty.deref() {
+        Type::Path(type_path) if type_path.path.is_ident(opposite_stub_alias) => {
+            quote! { __rpc_opposite_stub_weak_handle__ }
+        }
+        _ => {
+            let pat = &arg.pat;
+            quote!(#pat)
+        }
     });
 
     let remote_method_name = &remote_method.ident;
 
-    let method_caller = match remote_method.receiver {
-        None => quote!(#associated_state_struct_name::#remote_method_name(#(#args_names,)*)),
+    let mut method_caller = match remote_method.receiver {
+        None => quote! {
+            #associated_state_struct_name::<RequestSender>::#remote_method_name(#(#args_names,)*)
+        },
         Some(_) => quote!(self.state.#remote_method_name(#(#args_names,)*)),
     };
+
+    if remote_method.is_async {
+        method_caller = quote!(#method_caller.await)
+    }
 
     quote! {
         #method_name_as_literal_str => {

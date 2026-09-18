@@ -1,22 +1,26 @@
+use std::ops::Deref;
+
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{LitStr, ReturnType};
+use syn::{LitStr, ReturnType, Type};
 
 use crate::service::{RemoteMethod, Service, SubService, code_generation::utils::ident_to_lit_str};
 
 impl Service {
     pub fn stubs(&self) -> TokenStream {
         let client_stub = self.stub(
-            quote!(GenericClientStub),
+            quote!(ClientStub),
             quote!(ClientStubArcHandle),
             quote!(ClientStubWeakHandle),
             &self.client_remote_methods,
+            "ServerStub",
         );
         let server_stub = self.stub(
-            quote!(GenericServerStub),
+            quote!(ServerStub),
             quote!(ServerStubArcHandle),
             quote!(ServerStubWeakHandle),
             &self.server_remote_methods,
+            "ClientStub",
         );
 
         quote! {
@@ -31,10 +35,14 @@ impl Service {
         arc_stub_struct_name: TokenStream,
         weak_stub_struct_name: TokenStream,
         associated_remote_methods: &[RemoteMethod],
+        opposite_stub_alias: &str,
     ) -> TokenStream {
         let sub_services_stub_fields = self.sub_services_stub_fields(&generic_stub_struct_name);
-        let remote_methods_callers =
-            remote_methods_callers(&generic_stub_struct_name, associated_remote_methods);
+        let remote_methods_callers = remote_methods_callers(
+            &generic_stub_struct_name,
+            associated_remote_methods,
+            opposite_stub_alias,
+        );
         let impl_stub_trait = self.impl_stub_trait(&generic_stub_struct_name);
         let impl_subscribable_stub_trait = impl_subscribable_stub_trait(&generic_stub_struct_name);
 
@@ -131,8 +139,11 @@ impl Service {
 fn remote_methods_callers(
     generic_stub_struct_name: &TokenStream,
     associated_remote_methods: &[RemoteMethod],
+    opposite_stub_alias: &str,
 ) -> TokenStream {
-    let associated_remote_methods = associated_remote_methods.iter().map(remote_method_caller);
+    let associated_remote_methods = associated_remote_methods
+        .iter()
+        .map(|remote_method| remote_method_caller(remote_method, opposite_stub_alias));
 
     quote! {
         impl<RequestSender> #generic_stub_struct_name<RequestSender>
@@ -147,11 +158,13 @@ fn remote_methods_callers(
 fn remote_method_caller(
     RemoteMethod {
         vis,
+        is_async: _,
         ident,
         receiver: _,
         args,
         output,
     }: &RemoteMethod,
+    opposite_stub_alias: &str,
 ) -> TokenStream {
     let output = match output {
         ReturnType::Default => quote!(-> rpc_genie::SingleRequestSender<RequestSender, ()>),
@@ -160,7 +173,15 @@ fn remote_method_caller(
         }
     };
 
-    let add_params = args.iter().map(|arg| {
+    let args = args.iter().filter(|arg| match arg.ty.deref() {
+        Type::Path(type_path) if type_path.path.is_ident(opposite_stub_alias) => {
+            // The stub is not an argument we send since it only exists on the remote machine
+            false
+        }
+        _ => true,
+    });
+
+    let add_params = args.clone().map(|arg| {
         let ty = &arg.ty;
         let pat = &arg.pat;
         quote!(.add_param::<#ty>(#pat))
