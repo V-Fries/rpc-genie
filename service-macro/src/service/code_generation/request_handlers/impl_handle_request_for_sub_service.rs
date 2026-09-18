@@ -13,9 +13,9 @@ pub fn impl_handle_request_for_sub_service(
     quote! {
         impl<RequestSender>
             rpc_genie::HandleRequest<#generic_opposite_stub_struct_name<RequestSender>>
-            for #associated_sub_service_struct_name
+            for #associated_sub_service_struct_name<RequestSender>
         where
-            RequestSender: Send + Sync,
+            RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
         {
             async fn handle_request(
                 &self,

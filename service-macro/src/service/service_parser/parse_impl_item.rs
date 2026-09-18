@@ -1,6 +1,10 @@
 use std::ops::Deref;
 
-use syn::{Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Safety, Type};
+use proc_macro2::TokenStream;
+use quote::quote;
+use syn::{
+    Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Safety, Type, WhereClause, parse_quote,
+};
 
 use crate::service::{RemoteMethod, service_parser::error_helpers::create_result};
 
@@ -19,10 +23,24 @@ pub fn parse_impl_item(
 ) {
     match is_impl_block_for_server_or_client(&item_impl) {
         ImplForServerOrClient::Server => {
-            push_remote_methods(&mut service.server_remote_methods, &mut item_impl, errors);
+            push_remote_methods(
+                &mut service.server_remote_methods,
+                &mut item_impl,
+                errors,
+                "ClientStub",
+                quote!(ClientStub),
+            );
+            add_where_clause("Server", &mut item_impl.generics.where_clause, errors);
         }
         ImplForServerOrClient::Client => {
-            push_remote_methods(&mut service.client_remote_methods, &mut item_impl, errors);
+            push_remote_methods(
+                &mut service.client_remote_methods,
+                &mut item_impl,
+                errors,
+                "ServerStub",
+                quote!(ServerStub),
+            );
+            add_where_clause("Client", &mut item_impl.generics.where_clause, errors);
         }
         ImplForServerOrClient::Neither => {
             check_non_state_struct_impl_for_remote_method_attr(&item_impl, errors)
@@ -32,10 +50,34 @@ pub fn parse_impl_item(
     service.rest.push(Item::Impl(item_impl));
 }
 
+/// Returns whether the impl block concerns the Server or the Client struct, or something else
+fn is_impl_block_for_server_or_client(item_impl: &ItemImpl) -> ImplForServerOrClient {
+    let Type::Path(type_path) = item_impl.self_ty.deref() else {
+        return ImplForServerOrClient::Neither;
+    };
+
+    if type_path.path.segments.len() != 1 {
+        return ImplForServerOrClient::Neither;
+    }
+
+    match type_path
+        .path
+        .segments
+        .first()
+        .map(|segment| &segment.ident)
+    {
+        Some(ident) if ident == "Server" => ImplForServerOrClient::Server,
+        Some(ident) if ident == "Client" => ImplForServerOrClient::Client,
+        _ => ImplForServerOrClient::Neither,
+    }
+}
+
 fn push_remote_methods(
     dst: &mut Vec<RemoteMethod>,
     item_impl: &mut ItemImpl,
     errors: &mut Option<syn::Error>,
+    opposite_stub_alias: &str,
+    opposite_stub_generic_handle: TokenStream,
 ) {
     let mut contains_remote_methods = false;
 
@@ -45,7 +87,11 @@ fn push_remote_methods(
         {
             contains_remote_methods = true;
 
-            match create_remote_method(impl_item_fn) {
+            match create_remote_method(
+                impl_item_fn,
+                opposite_stub_alias,
+                &opposite_stub_generic_handle,
+            ) {
                 Err(err) => combine_errors(errors, err),
                 Ok(remote_method) => dst.push(remote_method),
             }
@@ -104,22 +150,6 @@ fn has_remote_method_attr(impl_item_fn: &ImplItemFn, errors: &mut Option<syn::Er
     true
 }
 
-/// Returns whether the impl block concerns the Server or the Client struct, or something else
-fn is_impl_block_for_server_or_client(impl_item: &ItemImpl) -> ImplForServerOrClient {
-    match impl_item.self_ty.deref() {
-        Type::Path(type_path) => {
-            if type_path.path.is_ident("Server") {
-                ImplForServerOrClient::Server
-            } else if type_path.path.is_ident("Client") {
-                ImplForServerOrClient::Client
-            } else {
-                ImplForServerOrClient::Neither
-            }
-        }
-        _ => ImplForServerOrClient::Neither,
-    }
-}
-
 /// #[remote_method] attributes should not have any arguments so this returns an error if there are
 /// any
 fn check_remote_method_attr_args(attr: &Attribute, errors: &mut Option<syn::Error>) {
@@ -136,7 +166,11 @@ fn check_remote_method_attr_args(attr: &Attribute, errors: &mut Option<syn::Erro
     }
 }
 
-fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
+fn create_remote_method(
+    function: &mut ImplItemFn,
+    opposite_stub_alias: &str,
+    opposite_stub_generic_handle: &TokenStream,
+) -> syn::Result<RemoteMethod> {
     let mut errors = None;
 
     let mut remote_method = RemoteMethod {
@@ -171,6 +205,24 @@ fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
             FnArg::Typed(typed) => remote_method.args.push(typed.clone()),
         }
     }
+
+    function.sig.inputs = function
+        .sig
+        .inputs
+        .iter()
+        .cloned()
+        .map(|mut input| match input {
+            FnArg::Typed(ref mut pat_type) => match pat_type.ty.deref() {
+                Type::Path(type_path) if type_path.path.is_ident(opposite_stub_alias) => {
+                    pat_type.ty =
+                        parse_quote!(&std::sync::Arc<#opposite_stub_generic_handle<RequestSender>>);
+                    input
+                }
+                _ => input,
+            },
+            _ => input,
+        })
+        .collect();
 
     if let Some(const_keyword) = function.sig.constness {
         combine_errors(
@@ -245,4 +297,26 @@ fn check_non_state_method_for_remote_method_attr(
             ),
         );
     }
+}
+
+fn add_where_clause(
+    struct_name: &str,
+    where_clause: &mut Option<WhereClause>,
+    errors: &mut Option<syn::Error>,
+) {
+    if let Some(where_clause) = where_clause {
+        combine_errors(
+            errors,
+            syn::Error::new_spanned(
+                where_clause,
+                format!("Not allowed to have a where clause when implementing {struct_name}"),
+            ),
+        );
+        return;
+    }
+
+    *where_clause = Some(parse_quote! {
+        where
+            RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+    });
 }

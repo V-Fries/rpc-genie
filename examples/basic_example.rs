@@ -11,11 +11,11 @@ pub mod service_a {
         pub sub_service_2: super::service_b,
     }
 
-    pub struct Server {
+    pub struct Server<RequestSender> {
         pub server_name: String,
     }
 
-    impl Server {
+    impl<RequestSender> Server<RequestSender> {
         // pass &self for stateful functions (use mutexes and other solutions for mutability)
         #[remote_method]
         fn server_name(&self) -> String {
@@ -45,32 +45,47 @@ pub mod service_a {
         }
     }
 
-    pub struct Client {}
+    pub struct Client<RequestSender> {}
 }
 
 #[rpc_genie::service]
 mod service_b {
-    pub struct Server {
+    pub struct Server<RequestSender> {
         pub some_state: u32,
     }
 
-    pub struct Client {}
+    pub struct Client<RequestSender> {}
 }
 
 #[tokio::main]
 async fn main() {
-    use std::sync::Arc;
+    use rpc_genie::stream_handler::Handle;
+    use std::{
+        marker::PhantomData,
+        sync::{Arc, Weak},
+    };
+    use tokio::net::TcpStream;
 
-    let _server = service_a::Server {
+    let _server = service_a::Server::<Weak<Handle<1024, TcpStream>>> {
         server_name: "".to_string(),
         // Here we see that the sub services state are added to the main service state
-        sub_service_1: Arc::new(service_b::Server { some_state: 1 }),
-        sub_service_2: Arc::new(service_b::Server { some_state: 2 }),
+        sub_service_1: Arc::new(service_b::Server {
+            some_state: 1,
+            _request_sender: PhantomData,
+        }),
+        sub_service_2: Arc::new(service_b::Server {
+            some_state: 2,
+            _request_sender: PhantomData,
+        }),
     };
 
-    let _client = service_a::Client {
+    let _client = service_a::Client::<Weak<Handle<1024, TcpStream>>> {
         // Here we see that the sub services state are added to the main service state
-        sub_service_1: Arc::new(service_b::Client {}),
-        sub_service_2: Arc::new(service_b::Client {}),
+        sub_service_1: Arc::new(service_b::Client {
+            _request_sender: PhantomData,
+        }),
+        sub_service_2: Arc::new(service_b::Client {
+            _request_sender: PhantomData,
+        }),
     };
 }

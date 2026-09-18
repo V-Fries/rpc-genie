@@ -19,16 +19,18 @@ impl Service {
             quote!(Server),
             quote!(ServerSubServices),
             &self.server_remote_methods,
-            quote!(GenericClientStub),
+            quote!(ClientStub),
             &self.sub_services,
+            "ClientStub",
         );
         let client_request_handler = request_handler(
             quote!(ClientRequestHandler),
             quote!(Client),
             quote!(ClientSubServices),
             &self.client_remote_methods,
-            quote!(GenericServerStub),
+            quote!(ServerStub),
             &self.sub_services,
+            "ServerStub",
         );
 
         quote! {
@@ -46,6 +48,7 @@ fn request_handler(
     associated_remote_methods: &[RemoteMethod],
     weak_opposite_stub_struct_name: TokenStream,
     sub_services: &[SubService],
+    opposite_stub_alias: &str,
 ) -> TokenStream {
     let request_handler_struct_definition = request_handler_struct_definition(
         &request_handler_struct_name,
@@ -58,6 +61,7 @@ fn request_handler(
         &associated_state_struct_name,
         associated_remote_methods,
         &weak_opposite_stub_struct_name,
+        opposite_stub_alias,
     );
 
     let impl_handle_request_for_sub_service = impl_handle_request_for_sub_service(
@@ -80,10 +84,13 @@ fn request_handler_struct_definition(
 ) -> TokenStream {
     quote! {
         #[doc(hidden)]
-        pub struct #request_handler_struct_name {
+        pub struct #request_handler_struct_name<RequestSender>
+        where
+            RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+        {
             pub service_path: Option<String>,
-            pub state: std::sync::Arc<#associated_state_struct_name>,
-            pub sub_services: #associated_sub_service_struct_name,
+            pub state: std::sync::Arc<#associated_state_struct_name<RequestSender>>,
+            pub sub_services: #associated_sub_service_struct_name<RequestSender>,
         }
     }
 }

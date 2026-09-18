@@ -1,4 +1,5 @@
 mod request_handlers;
+mod server_and_client_structs;
 mod stubs;
 mod sub_services_from_state_impl_blocks;
 mod utils;
@@ -7,7 +8,7 @@ use super::{Service, SubService};
 
 use proc_macro2::TokenStream;
 use quote::{ToTokens, TokenStreamExt, quote};
-use syn::{ItemMod, ItemStruct};
+use syn::ItemMod;
 
 impl ToTokens for Service {
     fn to_tokens(&self, dst: &mut TokenStream) {
@@ -55,76 +56,13 @@ impl Service {
         }
     }
 
-    /// Creates the final code for the Server and Client
-    fn server_and_clients_structs(&self) -> TokenStream {
-        let create_final_struct = |ItemStruct {
-                                       attrs,
-                                       vis,
-                                       struct_token,
-                                       ident,
-                                       generics,
-                                       fields,
-                                       semi_token,
-                                   }: &ItemStruct,
-                                   trait_to_implement,
-                                   opposite_stub_type_name| {
-            let fields_iter = fields.iter();
-
-            let sub_services_fields = self.sub_services.iter().map(
-                |SubService {
-                     pub_keyword,
-                     name,
-                     colon,
-                     path,
-                 }| quote!(#pub_keyword #name #colon std::sync::Arc<#path::#ident>),
-            );
-
-            quote! {
-                #(#attrs)*
-                #vis #struct_token #ident #generics {
-                    #(#fields_iter,)*
-                    #(
-                        // We always add #[allow(unused)] to sub services state fields as the user
-                        // may never want to access the state directly from the parent
-                        // (The sub-service request handler has a ref to it's state, so the compiler
-                        // won't be able to see that the value is used unless it is used directly in
-                        // the parent)
-                        #[allow(unused)]
-                        #sub_services_fields,
-                    )*
-                }#semi_token
-
-                impl rpc_genie::State for #ident {}
-                impl<const MAX_FRAME_SIZE: usize, Stream>
-                    #trait_to_implement<MAX_FRAME_SIZE, Stream>
-                    for #ident
-                {
-                    type #opposite_stub_type_name =
-                        #opposite_stub_type_name<MAX_FRAME_SIZE, Stream>;
-                }
-            }
-        };
-
-        let server_state = create_final_struct(
-            &self.server,
-            quote!(rpc_genie::Server),
-            quote!(ClientStubArcHandle),
-        );
-        let client_state = create_final_struct(
-            &self.client,
-            quote!(rpc_genie::Client),
-            quote!(ServerStubArcHandle),
-        );
-
-        quote! {
-            #server_state
-            #client_state
-        }
-    }
-
     /// Creates the ServerSubServices and ClientSubServices structs
     fn sub_services_structs(&self) -> TokenStream {
         let fields_ast_creator = |field_type| {
+            if self.sub_services.is_empty() {
+                return quote!(pub _request_sender: std::marker::PhantomData<RequestSender>,);
+            }
+
             self.sub_services.iter().fold(
                 TokenStream::new(),
                 |acc,
@@ -136,7 +74,7 @@ impl Service {
                  }| {
                     quote! {
                         #acc
-                        #pub_keyword #name #colon std::sync::Arc<#path::#field_type>,
+                        #pub_keyword #name #colon std::sync::Arc<#path::#field_type<RequestSender>>,
                     }
                 },
             )
@@ -147,12 +85,18 @@ impl Service {
 
         quote! {
             #[doc(hidden)]
-            pub struct ServerSubServices {
+            pub struct ServerSubServices<RequestSender>
+            where
+                RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+            {
                 #server_side_fields
             }
 
             #[doc(hidden)]
-            pub struct ClientSubServices {
+            pub struct ClientSubServices<RequestSender>
+            where
+                RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+            {
                 #client_side_fields
             }
         }
@@ -166,17 +110,20 @@ fn into_request_handler_impl_blocks() -> TokenStream {
         associated_sub_services_struct_name: TokenStream,
     ) -> TokenStream {
         quote! {
-            impl rpc_genie::IntoRequestHandler<
-                #request_handler_struct_name,
-                #associated_sub_services_struct_name,
-            > for #state_struct_name {
+            impl<RequestSender> rpc_genie::IntoRequestHandler<
+                #request_handler_struct_name<RequestSender>,
+                #associated_sub_services_struct_name<RequestSender>,
+            > for #state_struct_name<RequestSender>
+                where
+                    RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+            {
                 fn into_request_handler(
                     self: std::sync::Arc<Self>,
                     service_path: Option<String>
-                ) -> std::sync::Arc<#request_handler_struct_name> {
+                ) -> std::sync::Arc<#request_handler_struct_name<RequestSender>> {
                     use rpc_genie::SubServicesFromState;
 
-                    std::sync::Arc::new(#request_handler_struct_name {
+                    std::sync::Arc::new(#request_handler_struct_name::<RequestSender> {
                         state: std::sync::Arc::clone(&self),
                         sub_services: #associated_sub_services_struct_name::from_state(
                             self,

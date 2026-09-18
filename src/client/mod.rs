@@ -38,8 +38,12 @@ pub async fn connect_client<
 where
     Stream: stream::Stream<Addr> + AsyncWrite + AsyncRead + Send + 'static,
     Addr: Into<String>,
-    Client: crate::Client<MAX_FRAME_SIZE, Stream, ServerStubArcHandle = ServerStubArcHandle>
-        + IntoRequestHandler<RequestHandler, SubServices>,
+    Client: crate::Client<
+            MAX_FRAME_SIZE,
+            Stream,
+            Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>,
+            ServerStubArcHandle = ServerStubArcHandle,
+        > + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ServerStubWeakHandle>,
     ServerStubArcHandle: crate::Stub<Arc<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>>,
     ServerStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>>,
