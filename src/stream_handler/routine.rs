@@ -56,10 +56,14 @@ where
             // frame_handler_loop() is not cancel safe, but it doesn't matter as the only thing
             // canceling it corrupts is the read buf which we won't use anymore anyway if we kill
             // the routine
-            should_send_disconnect_msg = self.frame_handler_loop(
+            () = self.frame_handler_loop(
                 BufReader::new(read_stream),
                 Arc::clone(&buf_writer),
-            ) => should_send_disconnect_msg,
+            ) => {
+                // frame_handler_loop only returns on error, we don't send the disconnect frame on
+                // error
+                ShouldSendDisconnectFrame::No
+            }
         };
 
         // TODO think about what to do with requests currently being handled
@@ -80,8 +84,7 @@ where
         self,
         mut buf_reader: BufReader<ReadHalf<Stream>>,
         buf_writer: Arc<Mutex<BufWriter<WriteHalf<Stream>>>>,
-    ) -> ShouldSendDisconnectFrame
-    where
+    ) where
         Stream: AsyncWrite + AsyncRead + Send + 'static,
     {
         loop {
@@ -99,7 +102,7 @@ where
 
                     // Something went wrong with the stream so sending a disconnect message would
                     // fail.
-                    return ShouldSendDisconnectFrame::No;
+                    break;
                 }
             };
 
@@ -108,7 +111,7 @@ where
             match frame {
                 Frame::Disconnected => {
                     // Disconnection was initiated by peer, so no need to send our own message.
-                    return ShouldSendDisconnectFrame::No;
+                    break;
                 }
                 Frame::RpcRequest(request) => {
                     let request_handler_clone = Arc::clone(&self.request_handler);
