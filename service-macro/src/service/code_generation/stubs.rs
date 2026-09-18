@@ -147,6 +147,7 @@ fn remote_methods_callers(
 fn remote_method_caller(
     RemoteMethod {
         vis,
+        is_async: _,
         ident,
         receiver: _,
         args,

@@ -150,6 +150,7 @@ fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
 
     let mut remote_method = RemoteMethod {
         vis: function.vis.clone(),
+        is_async: function.sig.asyncness.is_some(),
         ident: function.sig.ident.clone(),
         receiver: None,
         args: Vec::new(),

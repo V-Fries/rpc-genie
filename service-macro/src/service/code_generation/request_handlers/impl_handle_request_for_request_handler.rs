@@ -96,10 +96,14 @@ fn match_branch(
 
     let remote_method_name = &remote_method.ident;
 
-    let method_caller = match remote_method.receiver {
+    let mut method_caller = match remote_method.receiver {
         None => quote!(#associated_state_struct_name::#remote_method_name(#(#args_names,)*)),
         Some(_) => quote!(self.state.#remote_method_name(#(#args_names,)*)),
     };
+
+    if remote_method.is_async {
+        method_caller = quote!(#method_caller.await)
+    }
 
     quote! {
         #method_name_as_literal_str => {
