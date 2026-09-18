@@ -1,6 +1,3 @@
-// TODO remove this
-#![allow(dead_code)]
-
 mod stream;
 pub use stream::Stream;
 
@@ -12,6 +9,11 @@ use crate::{
     HandleRequest, IntoRequestHandler, SubServicesFromState,
     stream_handler::{self, StreamId},
 };
+
+pub struct ClientHandle<Stub, Client> {
+    pub server_stub: Stub,
+    pub state: Arc<Client>,
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -34,7 +36,7 @@ pub async fn connect_client<
 >(
     addr: Addr,
     client_state: Arc<Client>,
-) -> Result<ServerStubArcHandle, Error>
+) -> Result<ClientHandle<ServerStubArcHandle, Client>, Error>
 where
     Stream: stream::Stream<Addr> + AsyncWrite + AsyncRead + Send + 'static,
     Addr: Into<String>,
@@ -56,10 +58,10 @@ where
             source: err,
         })?;
     let stream_id = StreamId::next();
-    let request_handler = client_state.into_request_handler(None);
+    let request_handler = Arc::clone(&client_state).into_request_handler(None);
 
-    Ok(
-        ServerStubArcHandle::new(
+    Ok(ClientHandle {
+        server_stub: ServerStubArcHandle::new(
             stream_handler::spawn_routine::<
                 MAX_FRAME_SIZE,
                 Stream,
@@ -69,5 +71,6 @@ where
             .await,
             None,
         ),
-    )
+        state: client_state,
+    })
 }
