@@ -24,6 +24,12 @@ pub enum Error {
     },
 }
 
+impl<Stub, Client> ClientHandle<Stub, Client> {
+    pub fn disconnect(self) {
+        // Dropping the server_stub field will disconnect automatically so no need to do anything
+    }
+}
+
 pub async fn connect_client<
     const MAX_FRAME_SIZE: usize,
     Addr,
@@ -61,16 +67,14 @@ where
     let request_handler = Arc::clone(&client_state).into_request_handler(None);
 
     Ok(ClientHandle {
-        server_stub: ServerStubArcHandle::new(
-            stream_handler::spawn_routine::<
-                MAX_FRAME_SIZE,
-                Stream,
-                RequestHandler,
-                ServerStubWeakHandle,
-            >(stream, stream_id, request_handler)
-            .await,
-            None,
-        ),
+        server_stub: stream_handler::spawn_client_routine::<
+            MAX_FRAME_SIZE,
+            Stream,
+            RequestHandler,
+            ServerStubArcHandle,
+            ServerStubWeakHandle,
+        >(stream, stream_id, request_handler)
+        .await,
         state: client_state,
     })
 }
