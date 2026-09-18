@@ -1,6 +1,6 @@
 use std::{io, time::Duration};
 
-use tokio::net::{UnixListener, UnixStream};
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs, UnixListener, UnixStream};
 
 pub trait Listener<Addr, Stream>: Sized + Send + 'static {
     fn bind(addr: &Addr) -> impl Future<Output = Result<Self, io::Error>>;
@@ -17,6 +17,24 @@ where
     }
 
     async fn accept(&self) -> UnixStream {
+        loop {
+            match self.accept().await {
+                Ok((stream, _)) => return stream,
+                Err(error) => handle_accept_error(error).await,
+            }
+        }
+    }
+}
+
+impl<Addr> Listener<Addr, TcpStream> for TcpListener
+where
+    Addr: ToSocketAddrs,
+{
+    async fn bind(addr: &Addr) -> Result<Self, io::Error> {
+        Self::bind(addr).await
+    }
+
+    async fn accept(&self) -> TcpStream {
         loop {
             match self.accept().await {
                 Ok((stream, _)) => return stream,
