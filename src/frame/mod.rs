@@ -21,6 +21,7 @@ use tokio::io::{
 pub enum Frame {
     RpcRequest(RpcRequest),
     RpcResponse(RpcResponse),
+    Disconnected,
 }
 
 impl Frame {

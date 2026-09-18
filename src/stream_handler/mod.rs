@@ -20,11 +20,16 @@ use crate::SubscribableStub;
 use crate::Topic;
 use crate::{HandleRequest, frame::rpc_response::RpcResponse};
 
-type KillRoutineSender = mpsc::Sender<()>;
-type KillRoutineReceiver = mpsc::Receiver<()>;
+type KillRoutineSender = mpsc::Sender<ShouldSendDisconnectFrame>;
+type KillRoutineReceiver = mpsc::Receiver<ShouldSendDisconnectFrame>;
 
 type ResponseSender = oneshot::Sender<Result<RpcResponse, StopReason>>;
 type _ResponseReceiver = oneshot::Receiver<Result<RpcResponse, StopReason>>;
+
+pub enum ShouldSendDisconnectFrame {
+    Yes,
+    No,
+}
 
 #[cfg(test)]
 mod test;
@@ -74,7 +79,7 @@ where
             request_handler,
             handle: handle_weak_ref.clone(),
             request_map,
-            weak_opposite_stub: Arc::new(OppositeStubWeakHandle::new(handle_weak_ref, None)),
+            opposite_stub_weak_handle: Arc::new(OppositeStubWeakHandle::new(handle_weak_ref, None)),
         }
         .routine(kill_routine_receiver, read_stream, buf_writer)
         .await;
@@ -131,7 +136,7 @@ where
             request_handler,
             handle: handle_weak_ref.clone(),
             request_map,
-            weak_opposite_stub: Arc::new(OppositeStubWeakHandle::new(handle_weak_ref, None)),
+            opposite_stub_weak_handle: Arc::new(OppositeStubWeakHandle::new(handle_weak_ref, None)),
         }
         .routine(kill_routine_receiver, read_stream, buf_writer)
         .await;

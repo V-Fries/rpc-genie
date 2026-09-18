@@ -16,17 +16,17 @@ use crate::{
         rpc_request::{RpcRequest, RpcRequestArgReader, RpcResponseMode},
         rpc_response::RpcResponse,
     },
-    stream_handler::{KillRoutineReceiver, ResponseSender, stream_id::StreamId},
+    stream_handler::{
+        KillRoutineReceiver, ResponseSender, ShouldSendDisconnectFrame, stream_id::StreamId,
+    },
 };
 
-// TODO remove allow dead_code
-#[allow(dead_code)]
 pub(super) struct Routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, WeakOppositeStub> {
     pub stream_id: StreamId,
     pub request_handler: Arc<RequestHandler>,
     pub request_map: Arc<Mutex<HashMap<RpcRequestId, ResponseSender>>>,
     pub handle: Weak<super::Handle<MAX_FRAME_SIZE, Stream>>,
-    pub weak_opposite_stub: Arc<WeakOppositeStub>,
+    pub opposite_stub_weak_handle: Arc<WeakOppositeStub>,
 }
 
 impl<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, WeakOppositeStub>
@@ -44,16 +44,31 @@ where
     ) where
         Stream: AsyncWrite + AsyncRead + Send + 'static,
     {
-        tokio::select! {
-            _ = kill_routine_receiver.recv() => {}
+        let should_send_disconnect_msg = tokio::select! {
+            should_send_disconnect_msg = kill_routine_receiver.recv() => {
+                should_send_disconnect_msg
+                    .expect(
+                        "stream_handler::Handle holds a sender and uses it on Drop, so this can \
+                         never be None"
+                    )
+            }
 
             // frame_handler_loop() is not cancel safe, but it doesn't matter as the only thing
-            // canceling it corrupts is the stream which we won't use anymore anyway if we kill the
-            // routine
-            _ = self.frame_handler_loop(
+            // canceling it corrupts is the read buf which we won't use anymore anyway if we kill
+            // the routine
+            should_send_disconnect_msg = self.frame_handler_loop(
                 BufReader::new(read_stream),
-                buf_writer,
-            ) => {}
+                Arc::clone(&buf_writer),
+            ) => should_send_disconnect_msg,
+        };
+
+        // TODO think about what to do with requests currently being handled
+        // For now we will let them continue
+        if let ShouldSendDisconnectFrame::Yes = should_send_disconnect_msg {
+            // TODO log error
+            let _ = Frame::Disconnected
+                .write_frame::<MAX_FRAME_SIZE>(&mut *buf_writer.lock().await)
+                .await;
         }
     }
 
@@ -65,7 +80,8 @@ where
         self,
         mut buf_reader: BufReader<ReadHalf<Stream>>,
         buf_writer: Arc<Mutex<BufWriter<WriteHalf<Stream>>>>,
-    ) where
+    ) -> ShouldSendDisconnectFrame
+    where
         Stream: AsyncWrite + AsyncRead + Send + 'static,
     {
         loop {
@@ -77,22 +93,27 @@ where
                         self.stream_id
                     );
 
-                    let Some(handle) = self.handle.upgrade() else {
-                        break;
+                    if let Some(handle) = self.handle.upgrade() {
+                        handle.stop_with(err.into()).await;
                     };
 
-                    handle.stop_with(err.into()).await;
-                    break;
+                    // Something went wrong with the stream so sending a disconnect message would
+                    // fail.
+                    return ShouldSendDisconnectFrame::No;
                 }
             };
 
             println!("Stream {}: Received new frame", self.stream_id);
 
             match frame {
+                Frame::Disconnected => {
+                    // Disconnection was initiated by peer, so no need to send our own message.
+                    return ShouldSendDisconnectFrame::No;
+                }
                 Frame::RpcRequest(request) => {
                     let request_handler_clone = Arc::clone(&self.request_handler);
                     let handle_clone = self.handle.clone();
-                    let stub_clone = self.weak_opposite_stub.clone();
+                    let stub_clone = self.opposite_stub_weak_handle.clone();
                     let buf_writer_clone = Arc::clone(&buf_writer);
                     tokio::spawn(async move {
                         Self::handle_rpc_request(

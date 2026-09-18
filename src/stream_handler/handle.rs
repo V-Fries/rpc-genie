@@ -18,7 +18,7 @@ use crate::{
         rpc_response::RpcResponse,
     },
     send_request::SendRequest,
-    stream_handler::{KillRoutineSender, ResponseSender, StreamId},
+    stream_handler::{KillRoutineSender, ResponseSender, ShouldSendDisconnectFrame, StreamId},
     topic::{self, StubDiedNotificationSender, TopicId},
 };
 
@@ -115,10 +115,10 @@ impl<const MAX_FRAME_SIZE: usize, Stream> Handle<MAX_FRAME_SIZE, Stream> {
 
     pub(super) async fn stop_with(&self, stop_reason: StopReason) {
         self.state.lock().await.stop_with(stop_reason).await;
-        self.send_death_notifications();
+        self.send_death_notifications_to_topics();
     }
 
-    fn send_death_notifications(&self) {
+    fn send_death_notifications_to_topics(&self) {
         let mut registered_topics_lock = self
             .registered_topics
             .lock()
@@ -130,7 +130,7 @@ impl<const MAX_FRAME_SIZE: usize, Stream> Handle<MAX_FRAME_SIZE, Stream> {
 
 impl<const MAX_FRAME_SIZE: usize, Stream> Drop for Handle<MAX_FRAME_SIZE, Stream> {
     fn drop(&mut self) {
-        self.send_death_notifications();
+        self.send_death_notifications_to_topics();
     }
 }
 
@@ -138,7 +138,9 @@ impl<const MAX_FRAME_SIZE: usize, Stream> Drop for RunningState<MAX_FRAME_SIZE, 
     fn drop(&mut self) {
         // Ignore result as the routine could end before we drop the handles. ie.e the receiver is
         // dropped
-        let _ = self.kill_routine_sender.try_send(());
+        let _ = self
+            .kill_routine_sender
+            .try_send(ShouldSendDisconnectFrame::Yes);
     }
 }
 
@@ -285,7 +287,20 @@ impl<const MAX_FRAME_SIZE: usize, Stream> State<MAX_FRAME_SIZE, Stream> {
                 // Don't check for error as the receiver could already be dropped (this is expected
                 // in some cases, e.g. stop_with() was called by the routine's task after
                 // the routine ended on it's own)
-                let _ = state.kill_routine_sender.send(()).await;
+                match stop_reason {
+                    StopReason::ManualStop | StopReason::HandleWasDropped => {
+                        let _ = state
+                            .kill_routine_sender
+                            .send(ShouldSendDisconnectFrame::Yes)
+                            .await;
+                    }
+                    StopReason::StreamReadError(_) | StopReason::StreamWriteError(_) => {
+                        let _ = state
+                            .kill_routine_sender
+                            .send(ShouldSendDisconnectFrame::No)
+                            .await;
+                    }
+                }
 
                 for sender in mem::take(&mut *state.request_map.lock().await).into_values() {
                     let _ = sender.send(Err(stop_reason.clone()));
