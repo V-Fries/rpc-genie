@@ -12,6 +12,9 @@ pub use send_request::SendRequest;
 pub mod topic;
 pub use topic::Topic;
 
+mod unix_socket;
+pub use unix_socket::UnixSocket;
+
 #[doc(hidden)]
 pub mod frame;
 
