@@ -148,6 +148,97 @@ macro_rules! expect_error {
 }
 
 #[test]
+fn error_if_remote_method_is_const() {
+    let service = quote! {
+        mod foo {
+            struct Server {}
+
+            impl Server {
+                #[remote_method]
+                const fn bar() {}
+            }
+
+            struct Client {}
+        }
+    };
+    expect_error!(
+        service,
+        "Remote methods may not be const. A const function can be evaluated at compile time, so \
+         there is no reason to ever call it on a remote device"
+    );
+}
+
+#[test]
+fn error_if_remote_method_is_unsafe() {
+    let service = quote! {
+        mod foo {
+            struct Server {}
+
+            impl Server {
+                #[remote_method]
+                unsafe fn bar() {}
+            }
+
+            struct Client {}
+        }
+    };
+    expect_error!(service, "Remote methods may not be unsafe");
+}
+
+#[test]
+fn error_if_remote_method_has_generic_params() {
+    let service = quote! {
+        mod foo {
+            struct Server {}
+
+            impl Server {
+                #[remote_method]
+                fn bar<T>() {}
+            }
+
+            struct Client {}
+        }
+    };
+    expect_error!(service, "Remote methods may not have generic parameters");
+}
+
+#[test]
+fn error_if_remote_method_has_where_clause() {
+    let service = quote! {
+        mod foo {
+            struct Server {}
+
+            impl Server {
+                #[remote_method]
+                fn bar()
+                where
+                {}
+            }
+
+            struct Client {}
+        }
+    };
+    expect_error!(service, "Remote methods may not have a where clause");
+}
+
+#[test]
+fn error_if_remote_method_has_variadic_param() {
+    let service = quote! {
+        mod foo {
+            struct Server {}
+
+            impl Server {
+                #[remote_method]
+                fn bar(...) {}
+            }
+
+            struct Client {}
+        }
+    };
+    expect_error!(service, "Remote methods may not have variadic arguments");
+}
+
+#[test]
 fn error_if_duplicate_server() {
     let service = quote! {
         mod foo {

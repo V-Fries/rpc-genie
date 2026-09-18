@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use syn::{Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Type};
+use syn::{Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Safety, Type};
 
 use crate::service::{RemoteMethod, service_parser::error_helpers::create_result};
 
@@ -170,6 +170,48 @@ fn create_remote_method(function: &ImplItemFn) -> syn::Result<RemoteMethod> {
             }
             FnArg::Typed(typed) => remote_method.args.push(typed.clone()),
         }
+    }
+
+    if let Some(const_keyword) = function.sig.constness {
+        combine_errors(
+            &mut errors,
+            syn::Error::new_spanned(
+                const_keyword,
+                "Remote methods may not be const. A const function can be evaluated at compile \
+                 time, so there is no reason to ever call it on a remote device",
+            ),
+        );
+    }
+
+    if let Safety::Unsafe(unsafe_keyword) = function.sig.safety {
+        combine_errors(
+            &mut errors,
+            syn::Error::new_spanned(unsafe_keyword, "Remote methods may not be unsafe"),
+        );
+    }
+
+    if !function.sig.generics.params.is_empty() {
+        combine_errors(
+            &mut errors,
+            syn::Error::new_spanned(
+                &function.sig.generics.params,
+                "Remote methods may not have generic parameters",
+            ),
+        );
+    }
+
+    if let Some(ref where_clause) = function.sig.generics.where_clause {
+        combine_errors(
+            &mut errors,
+            syn::Error::new_spanned(where_clause, "Remote methods may not have a where clause"),
+        );
+    }
+
+    if let Some(ref variadic) = function.sig.variadic {
+        combine_errors(
+            &mut errors,
+            syn::Error::new_spanned(variadic, "Remote methods may not have variadic arguments"),
+        );
     }
 
     create_result(remote_method, errors)
