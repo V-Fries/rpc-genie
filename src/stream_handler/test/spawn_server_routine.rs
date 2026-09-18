@@ -213,7 +213,7 @@ async fn stop_resolves_pending_call() {
         .unwrap_err();
     assert_matches!(
         error,
-        crate::CallError::RoutineIsStopped(StopReason::ManualStop)
+        crate::CallError::RoutineIsStopped(StopReason::HandleWasDropped)
     );
 
     stub.stop().await;

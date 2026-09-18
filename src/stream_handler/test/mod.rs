@@ -85,7 +85,8 @@ impl SendRequest for TestStubArcHandle {
 
 impl TestStubArcHandle {
     async fn stop(&self) {
-        self.0.stop().await;
+        // It wasn't dropped but we just need to give any reason to test that stop_with works
+        self.0.stop_with(StopReason::HandleWasDropped).await;
     }
 }
 
