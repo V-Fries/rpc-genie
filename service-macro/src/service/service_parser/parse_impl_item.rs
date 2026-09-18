@@ -3,7 +3,8 @@ use std::ops::Deref;
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{
-    Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Safety, Type, WhereClause, parse_quote,
+    Attribute, FnArg, ImplItem, ImplItemFn, Item, ItemImpl, Safety, Signature, Type, WhereClause,
+    parse_quote, punctuated::Punctuated, token::Comma,
 };
 
 use crate::service::{RemoteMethod, service_parser::error_helpers::create_result};
@@ -87,7 +88,7 @@ fn push_remote_methods(
         {
             contains_remote_methods = true;
 
-            match create_remote_method(
+            match parse_remote_method(
                 impl_item_fn,
                 opposite_stub_alias,
                 &opposite_stub_generic_handle,
@@ -166,13 +167,27 @@ fn check_remote_method_attr_args(attr: &Attribute, errors: &mut Option<syn::Erro
     }
 }
 
-fn create_remote_method(
+fn parse_remote_method(
     function: &mut ImplItemFn,
     opposite_stub_alias: &str,
     opposite_stub_generic_handle: &TokenStream,
 ) -> syn::Result<RemoteMethod> {
     let mut errors = None;
 
+    let remote_method = remote_method_from(function, &mut errors);
+
+    replace_opposite_stub_alias_with_actual_type(
+        &mut function.sig.inputs,
+        opposite_stub_alias,
+        opposite_stub_generic_handle,
+    );
+
+    check_remote_method_signature(&function.sig, &mut errors);
+
+    create_result(remote_method, errors)
+}
+
+fn remote_method_from(function: &ImplItemFn, errors: &mut Option<syn::Error>) -> RemoteMethod {
     let mut remote_method = RemoteMethod {
         vis: function.vis.clone(),
         is_async: function.sig.asyncness.is_some(),
@@ -194,7 +209,7 @@ fn create_remote_method(
         match input {
             FnArg::Receiver(_) => {
                 combine_errors(
-                    &mut errors,
+                    errors,
                     syn::Error::new_spanned(
                         input,
                         "rpc_genie crate has a bug, please create an issue with the prototype of \
@@ -206,9 +221,15 @@ fn create_remote_method(
         }
     }
 
-    function.sig.inputs = function
-        .sig
-        .inputs
+    remote_method
+}
+
+fn replace_opposite_stub_alias_with_actual_type(
+    inputs: &mut Punctuated<FnArg, Comma>,
+    opposite_stub_alias: &str,
+    opposite_stub_generic_handle: &TokenStream,
+) {
+    *inputs = inputs
         .iter()
         .cloned()
         .map(|mut input| match input {
@@ -223,10 +244,12 @@ fn create_remote_method(
             _ => input,
         })
         .collect();
+}
 
-    if let Some(const_keyword) = function.sig.constness {
+fn check_remote_method_signature(signature: &Signature, errors: &mut Option<syn::Error>) {
+    if let Some(const_keyword) = signature.constness {
         combine_errors(
-            &mut errors,
+            errors,
             syn::Error::new_spanned(
                 const_keyword,
                 "Remote methods may not be const. A const function can be evaluated at compile \
@@ -235,38 +258,36 @@ fn create_remote_method(
         );
     }
 
-    if let Safety::Unsafe(unsafe_keyword) = function.sig.safety {
+    if let Safety::Unsafe(unsafe_keyword) = signature.safety {
         combine_errors(
-            &mut errors,
+            errors,
             syn::Error::new_spanned(unsafe_keyword, "Remote methods may not be unsafe"),
         );
     }
 
-    if !function.sig.generics.params.is_empty() {
+    if !signature.generics.params.is_empty() {
         combine_errors(
-            &mut errors,
+            errors,
             syn::Error::new_spanned(
-                &function.sig.generics.params,
+                &signature.generics.params,
                 "Remote methods may not have generic parameters",
             ),
         );
     }
 
-    if let Some(ref where_clause) = function.sig.generics.where_clause {
+    if let Some(ref where_clause) = signature.generics.where_clause {
         combine_errors(
-            &mut errors,
+            errors,
             syn::Error::new_spanned(where_clause, "Remote methods may not have a where clause"),
         );
     }
 
-    if let Some(ref variadic) = function.sig.variadic {
+    if let Some(ref variadic) = signature.variadic {
         combine_errors(
-            &mut errors,
+            errors,
             syn::Error::new_spanned(variadic, "Remote methods may not have variadic arguments"),
         );
     }
-
-    create_result(remote_method, errors)
 }
 
 fn check_non_state_struct_impl_for_remote_method_attr(
