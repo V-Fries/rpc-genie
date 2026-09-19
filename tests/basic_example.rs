@@ -143,7 +143,7 @@ async fn server_tests(
     client_disconnected_receiver: tokio::sync::oneshot::Receiver<()>,
     server_doesnt_need_client_anymore_sender: tokio::sync::oneshot::Sender<()>,
 ) {
-    // wait still client connects before running our tests
+    // wait till client connects before running our tests
     tokio::time::timeout(std::time::Duration::from_secs(1), async {
         loop {
             if server_handle.map_each_client(|_| async {}).await.len() == 1 {

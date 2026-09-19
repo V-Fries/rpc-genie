@@ -1,10 +1,12 @@
 Typed asynchronous bidirectional RPC over TCP or Unix-domain sockets.
 
 # Usage:
+
 - Define a service with the [`service`] macro
 - Use [`Tcp`]/[`UnixSocket`] to start the server and connect the clients
 
 # Example:
+
 ```rust
 mod services {
     #[rpc_genie::service]
@@ -19,7 +21,7 @@ mod services {
             // Server will have one field per sub_services added automatically
             pub server_name: String,
         }
-        
+
         impl<RequestSender> Server<RequestSender> {
             // The #[remote_method] attribute marks this method as being callable from the
             // client
@@ -64,36 +66,35 @@ mod services {
     #[rpc_genie::service]
     pub mod message_publisher {
         use std::sync::Arc;
-   
+
         pub struct Server<RequestSender> {
             // topic makes it trivial to write pub/subs
             pub topic: Topic,
         }
-   
+
         impl<RequestSender> Server<RequestSender> {
             #[remote_method]
             pub async fn subscribe(&self, client_stub: ClientStub) {
                 self.topic.subscribe(Arc::clone(client_stub)).await
             }
-   
+
             #[remote_method]
             pub async fn unsubscribe(&self, client_stub: ClientStub) {
                 self.topic.unsubscribe(client_stub).await
             }
-   
+
             #[remote_method]
             pub async fn publish(&self, msg: String) {
+                // Call the print method on each subscribed clients
                 self.topic.for_each(async |client_stub| {
                     client_stub.print(msg.clone()).notify().await.unwrap()
                 }).await
             }
         }
-   
+
         pub struct Client<RequestSender> {}
-   
+
         impl<RequestSender> Client<RequestSender> {
-            // Clients can also have methods with #[remote_method], making the method callable
-            // from the server
             #[remote_method]
             pub fn print(msg: String) {
                 println!("{msg}")
@@ -128,7 +129,7 @@ async fn server(server_doesnt_need_client_anymore_sender: oneshot::Sender<()>) {
         ADDR,
         Arc::new(services::a::Server {
             server_name: "server".to_string(),
-            // Here we see that the sub services state are added to the main service state
+            // Here we see that the sub services state are added to the parent service state
             message_publisher: Arc::new(services::message_publisher::Server {
                 topic: Topic::new().await,
             }),
@@ -137,14 +138,12 @@ async fn server(server_doesnt_need_client_anymore_sender: oneshot::Sender<()>) {
     .await
     .unwrap();
 
-    // wait still client connects before running our tests
+    // wait till client connects before running our tests
     tokio::time::timeout(Duration::from_secs(1), async {
         loop {
             if server_handle.map_each_client(|_| async {}).await.len() == 1 {
                 break;
             }
-
-            tokio::task::yield_now().await;
         }
     })
     .await
@@ -176,19 +175,19 @@ async fn server(server_doesnt_need_client_anymore_sender: oneshot::Sender<()>) {
 async fn client(server_doesnt_need_client_anymore_receiver: oneshot::Receiver<()>) {
     let client_handle = tokio::time::timeout(Duration::from_secs(1), async {
         loop {
-            if let Ok(client_handle) = rpc_genie::Tcp::<MAX_FRAME_SIZE>::connect_client(
+            let result = rpc_genie::Tcp::<MAX_FRAME_SIZE>::connect_client(
                 ADDR,
                 Arc::new(services::a::Client {
-                    // Here we see that the sub services state are added to the main service state
+                    // Here we see that the sub services state are added to the parent service state
                     message_publisher: Arc::new(services::message_publisher::Client {
-                        // When a service has neither a sub service nor a topic, we need to add
+                        // When a service has neither a sub-service nor a topic, we need to add
                         // a phantom data of the request sender
                         _request_sender: PhantomData,
                     }),
-                }),
-            )
-            .await
-            {
+                })
+            ).await;
+
+            if let Ok(client_handle) = result {
                 return client_handle;
             }
         }
@@ -209,21 +208,19 @@ async fn client(server_doesnt_need_client_anymore_receiver: oneshot::Receiver<()
 
     // use notify if you don't care about the result and don't need to check whether the server
     // received the request
-    assert_eq!(
-        (),
-        client_handle
+    let () = client_handle
         .server_stub
         .get_server_name()
         .notify()
         .await
-        .unwrap()
-    );
+        .unwrap();
 
     server_doesnt_need_client_anymore_receiver.await.unwrap();
 }
 ```
 
 # Limitations:
-- Still in early development, breaking changes may be often
+
+- Still in early development, breaking changes may often occur
 - Proper logging is not yet implemented
 - On connect and on disconnect events are not yet implemented
