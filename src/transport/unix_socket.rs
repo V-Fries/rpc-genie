@@ -8,14 +8,14 @@ use crate::{
     server, stream_handler,
 };
 
-/// Unix-domain socket transport for RPC clients and servers.
+/// Unix socket transport for RPC clients and servers.
 ///
 /// `MAX_FRAME_SIZE` limits the serialized size of each RPC frame. Use the same
 /// limit for both ends of a connection.
 pub struct UnixSocket<const MAX_FRAME_SIZE: usize> {}
 
 impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
-    /// Bind a Unix-domain socket and start serving requests in the background.
+    /// Bind a Unix socket and start serving requests in the background.
     ///
     /// The returned [`server::ServerHandle`] owns the server task. Dropping it
     /// stops the task; use `wait_until_stopped` to keep the server running.
@@ -82,7 +82,7 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
         .await
     }
 
-    /// Connect to a Unix-domain socket server and start the client request routine.
+    /// Connect to a Unix socket server and start the client request routine.
     ///
     /// # Example
     /// ```rust
