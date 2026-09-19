@@ -97,8 +97,6 @@ impl RegisteredTopics {
 
 #[derive(serde::Deserialize, serde::Serialize, Clone, Debug, thiserror::Error)]
 pub enum StopReason {
-    #[error("The routine was stopped manually")]
-    ManualStop,
     #[error("Error while reading from stream")]
     StreamReadError(#[from] frame::ReadError),
     #[error("Error while writing to stream")]
@@ -108,11 +106,6 @@ pub enum StopReason {
 }
 
 impl<const MAX_FRAME_SIZE: usize, Stream> Handle<MAX_FRAME_SIZE, Stream> {
-    #[allow(dead_code)]
-    pub async fn stop(&self) {
-        self.stop_with(StopReason::ManualStop).await
-    }
-
     pub(super) async fn stop_with(&self, stop_reason: StopReason) {
         self.state.lock().await.stop_with(stop_reason).await;
         self.send_death_notifications_to_topics();
@@ -275,12 +268,6 @@ impl<const MAX_FRAME_SIZE: usize, Stream> State<MAX_FRAME_SIZE, Stream> {
         }
     }
 
-    // TODO remove allow(dead_code)
-    #[allow(dead_code)]
-    async fn stop(&mut self) {
-        self.stop_with(StopReason::ManualStop).await
-    }
-
     async fn stop_with(&mut self, stop_reason: StopReason) {
         match self {
             State::Running(state) => {
@@ -288,7 +275,7 @@ impl<const MAX_FRAME_SIZE: usize, Stream> State<MAX_FRAME_SIZE, Stream> {
                 // in some cases, e.g. stop_with() was called by the routine's task after
                 // the routine ended on it's own)
                 match stop_reason {
-                    StopReason::ManualStop | StopReason::HandleWasDropped => {
+                    StopReason::HandleWasDropped => {
                         let _ = state
                             .kill_routine_sender
                             .send(ShouldSendDisconnectFrame::Yes)

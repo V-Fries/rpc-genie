@@ -127,7 +127,8 @@ async fn stop_resolves_pending_call() {
     let (stub, mut client_reader, _client_writer) = start_test_routine().await;
     let stub_clone = stub.clone();
     let call_task = tokio::spawn(async move {
-        stub.call(crate::frame::rpc_request::RpcRequest::builder().method_path("echo"))
+        stub_clone
+            .call(crate::frame::rpc_request::RpcRequest::builder().method_path("echo"))
             .await
     });
 
@@ -139,7 +140,7 @@ async fn stop_resolves_pending_call() {
     .unwrap()
     .unwrap();
 
-    stub_clone.stop().await;
+    stub.stop().await;
 
     let error = tokio::time::timeout(std::time::Duration::from_secs(1), call_task)
         .await
@@ -148,7 +149,7 @@ async fn stop_resolves_pending_call() {
         .unwrap_err();
     assert_matches!(
         error,
-        crate::CallError::RoutineIsStopped(StopReason::ManualStop)
+        crate::CallError::RoutineIsStopped(StopReason::HandleWasDropped)
     );
 }
 
