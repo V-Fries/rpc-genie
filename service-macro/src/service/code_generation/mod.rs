@@ -43,6 +43,8 @@ impl Service {
         let stubs = self.stubs();
         let into_request_handler_impl_blocks = into_request_handler_impl_blocks();
         let sub_services_from_state_impl_blocks = self.sub_services_from_state_impl_blocks();
+        let client_handle_alias = client_handle_alias();
+        let server_handle_alias = server_handle_alias();
         let rest = &self.rest;
 
         quote! {
@@ -52,6 +54,8 @@ impl Service {
             #stubs
             #into_request_handler_impl_blocks
             #sub_services_from_state_impl_blocks
+            #client_handle_alias
+            #server_handle_alias
             #(#rest)*
         }
     }
@@ -150,5 +154,24 @@ fn into_request_handler_impl_blocks() -> TokenStream {
     quote! {
         #impl_as_request_handler_for_server
         #impl_as_request_handler_for_client
+    }
+}
+
+fn client_handle_alias() -> TokenStream {
+    quote! {
+        /// Type alias of an `rpc_genie::client::ClientHandle` for this service
+        pub type ClientHandle<const MAX_FRAME_SIZE: usize, Stream>
+            = rpc_genie::client::ClientHandle<
+                ServerStubArcHandle<MAX_FRAME_SIZE, Stream>,
+                Client<std::sync::Weak<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>>,
+            >;
+    }
+}
+
+fn server_handle_alias() -> TokenStream {
+    quote! {
+        /// Type alias of an `rpc_genie::server::ServerHandle` for this service
+        pub type ServerHandle<const MAX_FRAME_SIZE: usize, Stream>
+            = rpc_genie::server::ServerHandle<ClientStubArcHandle<MAX_FRAME_SIZE, Stream>>;
     }
 }

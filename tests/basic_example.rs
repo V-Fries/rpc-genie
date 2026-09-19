@@ -7,8 +7,6 @@ pub mod service_a {
     // Define other services to include in the current service
     sub_services! {
         // Can have any number of sub services
-        // If we use the same service module multiple times, the state is not shared (i.e. it is
-        // duplicated)
         pub sub_service_1: super::service_b,
         pub sub_service_2: super::service_b,
     }
@@ -121,6 +119,8 @@ async fn server(
                 some_state: 1,
                 _request_sender: std::marker::PhantomData,
             }),
+            // If you wanted, you could pass a clone of the Arc of sub_service_1, that way they
+            // would share their state
             sub_service_2: Arc::new(service_b::Server {
                 some_state: 2,
                 _request_sender: std::marker::PhantomData,
@@ -130,6 +130,19 @@ async fn server(
     .await
     .unwrap();
 
+    server_tests(
+        server_handle,
+        client_disconnected_receiver,
+        server_doesnt_need_client_anymore_sender,
+    )
+    .await
+}
+
+async fn server_tests(
+    server_handle: service_a::ServerHandle<1024, tokio::net::TcpStream>,
+    client_disconnected_receiver: tokio::sync::oneshot::Receiver<()>,
+    server_doesnt_need_client_anymore_sender: tokio::sync::oneshot::Sender<()>,
+) {
     // wait still client connects before running our tests
     tokio::time::timeout(std::time::Duration::from_secs(1), async {
         loop {
@@ -205,6 +218,19 @@ async fn client(
     .await
     .expect("client failed to connect to server");
 
+    client_tests(
+        client_handle,
+        client_disconnected_sender,
+        server_doesnt_need_client_anymore_receiver,
+    )
+    .await
+}
+
+async fn client_tests(
+    client_handle: service_a::ClientHandle<1024, tokio::net::TcpStream>,
+    client_disconnected_sender: tokio::sync::oneshot::Sender<()>,
+    server_doesnt_need_client_anymore_receiver: tokio::sync::oneshot::Receiver<()>,
+) {
     // You can then call the server's remote method directly
     assert_eq!(
         "server",
