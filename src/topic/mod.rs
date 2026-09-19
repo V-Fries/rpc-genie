@@ -18,6 +18,51 @@ use crate::{
 #[cfg(test)]
 mod test;
 
+/// A set of subscribed client stubs for broadcasting messages.
+///
+/// A topic removes subscriptions automatically when a stub's connection dies.
+///
+/// # Example:
+/// ```rust
+/// #[rpc_genie::service]
+/// mod message_publisher {
+///     use std::sync::Arc;
+///
+///     pub struct Server<RequestSender> {
+///         topic: Topic,
+///     }
+///
+///     impl<RequestSender> Server<RequestSender> {
+///         #[remote_method]
+///         pub async fn subscribe(&self, client_stub: ClientStub) {
+///             self.topic.subscribe(Arc::clone(client_stub)).await
+///         }
+///
+///         #[remote_method]
+///         pub async fn unsubscribe(&self, client_stub: ClientStub) {
+///             self.topic.unsubscribe(client_stub).await
+///         }
+///
+///         #[remote_method]
+///         pub async fn publish(&self, msg: String) {
+///             self.topic.for_each(async |client_stub| {
+///                 client_stub.print(msg.clone()).notify().await.unwrap()
+///             }).await
+///         }
+///     }
+///
+///     pub struct Client<RequestSender> {}
+///
+///     impl<RequestSender> Client<RequestSender> {
+///         // Clients can also have methods with #[remote_method], making the method callable
+///         // from the server
+///         #[remote_method]
+///         pub fn print(msg: String) {
+///             println!("{msg}")
+///         }
+///     }
+/// }
+/// ```
 pub struct Topic<Stub>
 where
     Stub: SubscribableStub,
@@ -30,6 +75,7 @@ impl<Stub> Topic<Stub>
 where
     Stub: Send + Sync + SubscribableStub + 'static,
 {
+    /// Create an empty topic.
     pub async fn new() -> Self {
         let (sender, subscribed_stubs) = Routine::spawn().await;
 
@@ -39,6 +85,7 @@ where
         }
     }
 
+    /// Subscribe a client stub. Subscribing an already subscribed stub is harmless.
     pub async fn subscribe(&self, stub: Arc<Stub>) {
         let (sender, receiver) = oneshot::channel();
 
@@ -56,6 +103,7 @@ where
         let _ = receiver.await;
     }
 
+    /// Remove a client stub from the topic. Unsubscribing an unsubscribed stub is harmless.
     pub async fn unsubscribe(&self, stub: &Arc<Stub>) {
         let Some(stream_id) = stub.stream_id() else {
             // stub is already dead so we don't subscribe
@@ -83,6 +131,7 @@ impl<Stub> Topic<Stub>
 where
     Stub: SubscribableStub,
 {
+    /// Invoke a callback concurrently for every subscribed stub and collect results.
     pub async fn map<CallbackFuture, FutureOutput>(
         &self,
         mut callback: impl FnMut(Arc<Stub>) -> CallbackFuture,
@@ -96,6 +145,7 @@ where
             .await
     }
 
+    /// Invoke a callback concurrently for every subscribed stub.
     pub async fn for_each<CallbackFuture>(
         &self,
         mut callback: impl FnMut(Arc<Stub>) -> CallbackFuture,
