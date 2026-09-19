@@ -32,8 +32,8 @@ impl Service {
     fn stub(
         &self,
         generic_stub_struct_name: TokenStream,
-        arc_stub_struct_name: TokenStream,
-        weak_stub_struct_name: TokenStream,
+        stub_arc_handle_type_name: TokenStream,
+        stub_weak_handle_type_name: TokenStream,
         associated_remote_methods: &[RemoteMethod],
         opposite_stub_alias: &str,
     ) -> TokenStream {
@@ -48,19 +48,20 @@ impl Service {
 
         quote! {
             #[derive(Clone)]
-            #[doc(hidden)]
             pub struct #generic_stub_struct_name<RequestSender> {
+                #[doc(hidden)]
                 __rpc_genie_request_sender__: RequestSender,
+                #[doc(hidden)]
                 __rpc_service_path__: Option<String>,
                 #sub_services_stub_fields
             }
 
-            pub type #arc_stub_struct_name<const MAX_FRAME_SIZE: usize, Stream> =
+            pub type #stub_arc_handle_type_name<const MAX_FRAME_SIZE: usize, Stream> =
                 #generic_stub_struct_name<
                     std::sync::Arc<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>
                 >;
 
-            pub type #weak_stub_struct_name<const MAX_FRAME_SIZE: usize, Stream> =
+            pub type #stub_weak_handle_type_name<const MAX_FRAME_SIZE: usize, Stream> =
                 #generic_stub_struct_name<
                     std::sync::Weak<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>
                 >;
