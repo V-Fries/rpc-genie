@@ -13,10 +13,8 @@ pub use send_request::SendRequest;
 pub mod topic;
 pub use topic::Topic;
 
-mod unix_socket;
-pub use unix_socket::UnixSocket;
-mod tcp;
-pub use tcp::Tcp;
+mod transport;
+pub use transport::{Tcp, UnixSocket};
 
 #[doc(hidden)]
 pub mod frame;

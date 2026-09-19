@@ -8,9 +8,40 @@ use crate::{
     server, stream_handler,
 };
 
+/// TCP transport for RPC clients and servers.
+///
+/// `MAX_FRAME_SIZE` limits the serialized size of each RPC frame. Use the same
+/// limit for both ends of a connection.
 pub struct Tcp<const MAX_FRAME_SIZE: usize> {}
 
 impl<const MAX_FRAME_SIZE: usize> Tcp<MAX_FRAME_SIZE> {
+    /// Bind a TCP listener and start serving requests in the background.
+    ///
+    /// The returned [`server::ServerHandle`] owns the server task. Dropping it
+    /// stops the task; use `wait_until_stopped` to keep the server running.
+    ///
+    /// # Example
+    /// ```rust
+    /// use std::{sync::Arc, marker::PhantomData};
+    ///
+    /// #[rpc_genie::service]
+    /// mod service {
+    ///     pub struct Server<RequestSender> {}
+    ///     pub struct Client<RequestSender> {}
+    /// }
+    ///
+    /// const MAX_FRAME_SIZE: usize = 1024 * 1024;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let _server_handle = rpc_genie::Tcp::<MAX_FRAME_SIZE>::start_server(
+    ///         "127.0.0.1:12345",
+    ///         Arc::new(service::Server {
+    ///             _request_sender: PhantomData
+    ///         })
+    ///     ).await;
+    /// }
+    /// ```
     pub async fn start_server<
         Addr,
         Server,
@@ -51,6 +82,30 @@ impl<const MAX_FRAME_SIZE: usize> Tcp<MAX_FRAME_SIZE> {
         .await
     }
 
+    /// Connect to a TCP server and start the client request routine.
+    ///
+    /// # Example
+    /// ```rust
+    /// use std::{sync::Arc, marker::PhantomData};
+    ///
+    /// #[rpc_genie::service]
+    /// mod service {
+    ///     pub struct Server<RequestSender> {}
+    ///     pub struct Client<RequestSender> {}
+    /// }
+    ///
+    /// const MAX_FRAME_SIZE: usize = 1024 * 1024;
+    ///
+    /// #[tokio::main]
+    /// async fn main() {
+    ///     let _client_handle = rpc_genie::Tcp::<MAX_FRAME_SIZE>::connect_client(
+    ///         "127.0.0.1:12345",
+    ///         Arc::new(service::Client {
+    ///             _request_sender: PhantomData
+    ///         })
+    ///     ).await;
+    /// }
+    /// ```
     pub async fn connect_client<
         Addr,
         Client,
