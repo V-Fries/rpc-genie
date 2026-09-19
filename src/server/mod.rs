@@ -143,7 +143,7 @@ where
     })
 }
 
-pub async fn server_routine<
+async fn server_routine<
     const MAX_FRAME_SIZE: usize,
     Listener,
     Addr,

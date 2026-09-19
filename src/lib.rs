@@ -6,6 +6,7 @@ pub mod stream_handler;
 
 #[doc(hidden)]
 pub mod send_request;
+#[doc(hidden)]
 pub use send_request::SendRequest;
 
 #[doc(hidden)]
