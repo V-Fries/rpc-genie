@@ -1,11 +1,13 @@
-Typed asynchronous bidirectional RPC over TCP or Unix-domain sockets.
+# rpc-genie
 
-# Usage:
+## Typed bidirectional RPC over TCP or Unix sockets
+
+## Usage:
 
 - Define a service with the [`service`] macro
 - Use [`Tcp`]/[`UnixSocket`] to start the server and connect the clients
 
-# Example:
+## Example:
 
 ```rust
 mod services {
@@ -219,7 +221,7 @@ async fn client(server_doesnt_need_client_anymore_receiver: oneshot::Receiver<()
 }
 ```
 
-# Limitations:
+## Limitations:
 
 - Still in early development, breaking changes may often occur
 - Proper logging is not yet implemented
