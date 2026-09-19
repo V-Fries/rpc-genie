@@ -21,7 +21,7 @@ impl<const MAX_FRAME_SIZE: usize> Tcp<MAX_FRAME_SIZE> {
     >(
         addr: Addr,
         server_state: Arc<Server>,
-    ) -> Result<server::ServerHandle<ClientStubArcHandle>, server::Error>
+    ) -> Result<server::ServerHandle<Server, ClientStubArcHandle>, server::Error>
     where
         Addr: ToSocketAddrs + Into<String>,
         Server: crate::Server<

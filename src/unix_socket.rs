@@ -21,7 +21,7 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
     >(
         socket_path: Path,
         server_state: Arc<Server>,
-    ) -> Result<server::ServerHandle<ClientStubArcHandle>, server::Error>
+    ) -> Result<server::ServerHandle<Server, ClientStubArcHandle>, server::Error>
     where
         Path: AsRef<std::path::Path> + Into<String>,
         Server: crate::Server<
