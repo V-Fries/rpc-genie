@@ -1,6 +1,6 @@
 use std::{
     collections::{HashMap, hash_map},
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, Weak},
 };
 
 use tokio::{sync::oneshot, task::JoinHandle};
@@ -55,27 +55,15 @@ where
         {
             hash_map::Entry::Occupied(_) => {}
             hash_map::Entry::Vacant(vacant_entry) => {
-                let sender = self.routine_command_sender.clone();
-
+                let routine_command_sender_clone = self.routine_command_sender.clone();
                 let weak_join_handles_ref = Arc::downgrade(&self.join_handles);
 
                 vacant_entry.insert(tokio::spawn(async move {
-                    let Ok(()) = stub_died_receiver.await else {
-                        return;
-                    };
-
-                    let Some(sender) = sender.upgrade() else {
-                        return;
-                    };
-
-                    let _ = sender.send(RoutineCommand::StubDied(stream_id)).await;
-
-                    if let Some(join_handles) = weak_join_handles_ref.upgrade() {
-                        join_handles
-                            .lock()
-                            .unwrap_or_else(|poison_error| poison_error.into_inner())
-                            .remove(&stream_id);
-                    }
+                    Self::task_routine(stream_id, stub_died_receiver, routine_command_sender_clone)
+                        .await;
+                    // Once the routine ends we need to remove the join handle from the HashMap
+                    // so that it doesn't grow eternally
+                    remove_join_handle(weak_join_handles_ref, stream_id);
                 }));
             }
         }
@@ -90,5 +78,33 @@ where
         {
             join_handle.abort();
         }
+    }
+
+    async fn task_routine(
+        stream_id: StreamId,
+        stub_died_receiver: StubDiedNotificationReceiver,
+        routine_command_sender: RoutineCommandWeakSender<Stub>,
+    ) {
+        let Ok(()) = stub_died_receiver.await else {
+            return;
+        };
+
+        let Some(sender) = routine_command_sender.upgrade() else {
+            return;
+        };
+
+        let _ = sender.send(RoutineCommand::StubDied(stream_id)).await;
+    }
+}
+
+fn remove_join_handle(
+    join_handles: Weak<Mutex<HashMap<StreamId, JoinHandle<()>>>>,
+    stream_id: StreamId,
+) {
+    if let Some(join_handles) = join_handles.upgrade() {
+        join_handles
+            .lock()
+            .unwrap_or_else(|poison_error| poison_error.into_inner())
+            .remove(&stream_id);
     }
 }
