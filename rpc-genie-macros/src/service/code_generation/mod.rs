@@ -171,10 +171,21 @@ fn client_handle_alias() -> TokenStream {
 fn server_handle_alias() -> TokenStream {
     quote! {
         /// Type alias of an `rpc_genie::server::ServerHandle` for this service
-        pub type ServerHandle<const MAX_FRAME_SIZE: usize, Stream>
+        pub type ServerHandle<const MAX_FRAME_SIZE: usize, Listener>
             = rpc_genie::server::ServerHandle<
-                Server<std::sync::Weak<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>>,
-                ClientStubArcHandle<MAX_FRAME_SIZE, Stream>,
+                Server<
+                    std::sync::Weak<
+                        rpc_genie::stream_handler::Handle<
+                            MAX_FRAME_SIZE,
+                            <Listener as rpc_genie::server::Listener>::Stream,
+                        >
+                    >
+                >,
+                ClientStubArcHandle<
+                    MAX_FRAME_SIZE,
+                    <Listener as rpc_genie::server::Listener>::Stream
+                >,
+                Listener,
             >;
     }
 }

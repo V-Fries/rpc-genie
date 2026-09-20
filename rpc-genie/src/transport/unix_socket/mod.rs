@@ -10,30 +10,6 @@ use crate::{
     server, stream_handler,
 };
 
-pub struct UnixSocketServerHandle<ServerHandle> {
-    server_handle: ServerHandle,
-    socket_path: String,
-}
-
-impl<ServerHandle> std::ops::Deref for UnixSocketServerHandle<ServerHandle> {
-    type Target = ServerHandle;
-
-    fn deref(&self) -> &Self::Target {
-        &self.server_handle
-    }
-}
-
-impl<ServerHandle> Drop for UnixSocketServerHandle<ServerHandle> {
-    fn drop(&mut self) {
-        if let Err(err) = std::fs::remove_file(&self.socket_path) {
-            eprintln!(
-                "Error: Failed to delete unix socket file \"{:?}\": {err}",
-                self.socket_path
-            )
-        }
-    }
-}
-
 /// Unix socket transport for RPC clients and servers.
 ///
 /// `MAX_FRAME_SIZE` limits the serialized size of each RPC frame. Use the same
@@ -72,21 +48,16 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
     /// }
     /// ```
     pub async fn start_server<
-        Path,
         Server,
         RequestHandler,
         ClientStubArcHandle,
         ClientStubWeakHandle,
         SubServices,
     >(
-        socket_path: Path,
+        socket_path: &str,
         server_state: Arc<Server>,
-    ) -> Result<
-        UnixSocketServerHandle<server::ServerHandle<Server, ClientStubArcHandle>>,
-        server::Error,
-    >
+    ) -> Result<server::ServerHandle<Server, ClientStubArcHandle, UnixListener>, server::Error>
     where
-        Path: AsRef<std::path::Path> + ToString,
         Server: crate::Server<
                 MAX_FRAME_SIZE,
                 UnixStream,
@@ -100,12 +71,9 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
             + SubscribableStub,
         SubServices: SubServicesFromState<Server>,
     {
-        let socket_path_as_string = socket_path.to_string();
-
-        let server_handle = server::start_server::<
+        server::start_server::<
             MAX_FRAME_SIZE,
             UnixListener,
-            Path,
             UnixStream,
             Server,
             RequestHandler,
@@ -113,12 +81,7 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
             ClientStubWeakHandle,
             SubServices,
         >(socket_path, server_state)
-        .await?;
-
-        Ok(UnixSocketServerHandle {
-            server_handle,
-            socket_path: socket_path_as_string,
-        })
+        .await
     }
 
     /// Connect to a Unix socket server and start the client request routine.

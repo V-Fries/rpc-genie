@@ -6,7 +6,10 @@ use tokio::{
     task::{JoinError, JoinHandle},
 };
 
-use std::sync::{Arc, Weak};
+use std::{
+    marker::PhantomData,
+    sync::{Arc, Weak},
+};
 
 use crate::{
     HandleRequest, IntoRequestHandler, SubServicesFromState, SubscribableStub, Topic,
@@ -45,8 +48,8 @@ pub enum Error {
 /// #[tokio::main]
 /// async fn main() {
 ///     // use the generated alias not the original ServerHandle type (it's way too long)
-///     let server_handle: service::ServerHandle<MAX_FRAME_SIZE, TcpStream> =
-///         rpc_genie::server::start_server::<_, TcpListener, _, _, _, _, _, _, _>(
+///     let server_handle: service::ServerHandle<MAX_FRAME_SIZE, TcpListener> =
+///         rpc_genie::server::start_server::<_, TcpListener, _, _, _, _, _, _>(
 ///             "127.0.0.1:12323",
 ///             Arc::new(service::Server {
 ///                 _request_sender: PhantomData,
@@ -56,29 +59,35 @@ pub enum Error {
 ///         .unwrap();
 /// }
 /// ```
-pub struct ServerHandle<ServerState, Stub>
+pub struct ServerHandle<ServerState, Stub, Listener>
 where
     Stub: SubscribableStub,
+    Listener: listener::Listener,
 {
     join_handle: Option<JoinHandle<()>>,
+    addr: String,
     topic: Arc<Topic<Stub>>,
     pub state: Arc<ServerState>,
+    _listener: PhantomData<fn() -> Listener>,
 }
 
-impl<ServerState, Stub> Drop for ServerHandle<ServerState, Stub>
+impl<ServerState, Stub, Listener, Stream> Drop for ServerHandle<ServerState, Stub, Listener>
 where
     Stub: SubscribableStub,
+    Listener: listener::Listener<Stream = Stream>,
 {
     fn drop(&mut self) {
         if let Some(join_handle) = self.join_handle.take() {
             join_handle.abort();
         }
+        Listener::on_routine_end(&self.addr)
     }
 }
 
-impl<ServerState, Stub> ServerHandle<ServerState, Stub>
+impl<ServerState, Stub, Listener, Stream> ServerHandle<ServerState, Stub, Listener>
 where
     Stub: SubscribableStub,
+    Listener: listener::Listener<Stream = Stream>,
 {
     /// Wait for the server task to stop and return its join result.
     pub async fn wait_until_stopped(mut self) -> Result<(), JoinError> {
@@ -96,9 +105,10 @@ where
     }
 }
 
-impl<ServerState, Stub> ServerHandle<ServerState, Stub>
+impl<ServerState, Stub, Listener, Stream> ServerHandle<ServerState, Stub, Listener>
 where
     Stub: SubscribableStub,
+    Listener: listener::Listener<Stream = Stream>,
 {
     /// Run a callback for every currently connected client concurrently and
     /// collect each callback's result.
@@ -135,7 +145,6 @@ where
 pub async fn start_server<
     const MAX_FRAME_SIZE: usize,
     Listener,
-    Addr,
     Stream,
     Server,
     RequestHandler,
@@ -143,12 +152,11 @@ pub async fn start_server<
     ClientStubWeakHandle,
     SubServices,
 >(
-    addr: Addr,
+    addr: &str,
     server_state: Arc<Server>,
-) -> Result<ServerHandle<Server, ClientStubArcHandle>, Error>
+) -> Result<ServerHandle<Server, ClientStubArcHandle, Listener>, Error>
 where
-    Listener: listener::Listener<Addr, Stream>,
-    Addr: ToString,
+    Listener: listener::Listener<Stream = Stream>,
     Stream: AsyncWrite + AsyncRead + Send + 'static,
     Server: crate::Server<
             MAX_FRAME_SIZE,
@@ -163,10 +171,10 @@ where
         crate::Stub<Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>> + SubscribableStub,
     SubServices: SubServicesFromState<Server>,
 {
-    let listener = Listener::bind(&addr)
+    let listener = Listener::bind(addr)
         .await
         .map_err(|error| Error::BindListener {
-            addr: addr.to_string(),
+            addr: addr.to_owned(),
             source: error,
         })?;
 
@@ -178,7 +186,6 @@ where
         server_routine::<
             MAX_FRAME_SIZE,
             Listener,
-            Addr,
             Server,
             Stream,
             RequestHandler,
@@ -191,15 +198,16 @@ where
 
     Ok(ServerHandle {
         join_handle: Some(join_handle),
+        addr: addr.to_owned(),
         topic,
         state: server_state,
+        _listener: PhantomData,
     })
 }
 
 async fn server_routine<
     const MAX_FRAME_SIZE: usize,
     Listener,
-    Addr,
     Server,
     Stream,
     RequestHandler,
@@ -211,7 +219,7 @@ async fn server_routine<
     server_state: Arc<Server>,
     topic: Weak<Topic<ClientStubArcHandle>>,
 ) where
-    Listener: listener::Listener<Addr, Stream>,
+    Listener: listener::Listener<Stream = Stream>,
     Server: crate::Server<
             MAX_FRAME_SIZE,
             Stream,
