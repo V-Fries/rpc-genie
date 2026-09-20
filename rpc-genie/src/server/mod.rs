@@ -148,7 +148,7 @@ pub async fn start_server<
 ) -> Result<ServerHandle<Server, ClientStubArcHandle>, Error>
 where
     Listener: listener::Listener<Addr, Stream>,
-    Addr: Into<String>,
+    Addr: ToString,
     Stream: AsyncWrite + AsyncRead + Send + 'static,
     Server: crate::Server<
             MAX_FRAME_SIZE,
@@ -166,7 +166,7 @@ where
     let listener = Listener::bind(&addr)
         .await
         .map_err(|error| Error::BindListener {
-            addr: addr.into(),
+            addr: addr.to_string(),
             source: error,
         })?;
 
