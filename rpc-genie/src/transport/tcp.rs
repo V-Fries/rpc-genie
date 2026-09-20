@@ -54,7 +54,7 @@ impl<const MAX_FRAME_SIZE: usize> Tcp<MAX_FRAME_SIZE> {
         server_state: Arc<Server>,
     ) -> Result<server::ServerHandle<Server, ClientStubArcHandle>, server::Error>
     where
-        Addr: ToSocketAddrs + Into<String>,
+        Addr: ToSocketAddrs + ToString,
         Server: crate::Server<
                 MAX_FRAME_SIZE,
                 TcpStream,

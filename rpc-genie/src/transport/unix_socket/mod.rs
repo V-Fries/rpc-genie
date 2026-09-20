@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod test;
 use std::sync::{Arc, Weak};
 
 use tokio::net::{UnixListener, UnixStream};
@@ -7,6 +9,30 @@ use crate::{
     client::{self, ClientHandle},
     server, stream_handler,
 };
+
+pub struct UnixSocketServerHandle<ServerHandle> {
+    server_handle: ServerHandle,
+    socket_path: String,
+}
+
+impl<ServerHandle> std::ops::Deref for UnixSocketServerHandle<ServerHandle> {
+    type Target = ServerHandle;
+
+    fn deref(&self) -> &Self::Target {
+        &self.server_handle
+    }
+}
+
+impl<ServerHandle> Drop for UnixSocketServerHandle<ServerHandle> {
+    fn drop(&mut self) {
+        if let Err(err) = std::fs::remove_file(&self.socket_path) {
+            eprintln!(
+                "Error: Failed to delete unix socket file \"{:?}\": {err}",
+                self.socket_path
+            )
+        }
+    }
+}
 
 /// Unix socket transport for RPC clients and servers.
 ///
@@ -34,12 +60,15 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
     ///
     /// #[tokio::main]
     /// async fn main() {
-    ///     let _result = rpc_genie::UnixSocket::<MAX_FRAME_SIZE>::start_server(
+    ///     std::fs::create_dir_all("/tmp/rpc-genie/tests/").unwrap();
+    ///     rpc_genie::UnixSocket::<MAX_FRAME_SIZE>::start_server(
     ///         "/tmp/rpc-genie/tests/unix_socket_start_server_doc_test.sock",
     ///         Arc::new(service::Server {
     ///             _request_sender: PhantomData
     ///         })
-    ///     ).await;
+    ///     )
+    ///     .await
+    ///     .unwrap();
     /// }
     /// ```
     pub async fn start_server<
@@ -52,9 +81,12 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
     >(
         socket_path: Path,
         server_state: Arc<Server>,
-    ) -> Result<server::ServerHandle<Server, ClientStubArcHandle>, server::Error>
+    ) -> Result<
+        UnixSocketServerHandle<server::ServerHandle<Server, ClientStubArcHandle>>,
+        server::Error,
+    >
     where
-        Path: AsRef<std::path::Path> + Into<String>,
+        Path: AsRef<std::path::Path> + ToString,
         Server: crate::Server<
                 MAX_FRAME_SIZE,
                 UnixStream,
@@ -68,7 +100,9 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
             + SubscribableStub,
         SubServices: SubServicesFromState<Server>,
     {
-        server::start_server::<
+        let socket_path_as_string = socket_path.to_string();
+
+        let server_handle = server::start_server::<
             MAX_FRAME_SIZE,
             UnixListener,
             Path,
@@ -79,7 +113,12 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
             ClientStubWeakHandle,
             SubServices,
         >(socket_path, server_state)
-        .await
+        .await?;
+
+        Ok(UnixSocketServerHandle {
+            server_handle,
+            socket_path: socket_path_as_string,
+        })
     }
 
     /// Connect to a Unix socket server and start the client request routine.
