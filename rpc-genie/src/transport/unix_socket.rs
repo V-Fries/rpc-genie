@@ -35,7 +35,7 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
     /// #[tokio::main]
     /// async fn main() {
     ///     let _result = rpc_genie::UnixSocket::<MAX_FRAME_SIZE>::start_server(
-    ///         "socket_file_path.sock",
+    ///         "/tmp/rpc-genie/tests/unix_socket_start_server_doc_test.sock",
     ///         Arc::new(service::Server {
     ///             _request_sender: PhantomData
     ///         })
@@ -99,7 +99,7 @@ impl<const MAX_FRAME_SIZE: usize> UnixSocket<MAX_FRAME_SIZE> {
     /// #[tokio::main]
     /// async fn main() {
     ///     let _result = rpc_genie::UnixSocket::<MAX_FRAME_SIZE>::connect_client(
-    ///         "socket_file_path.sock",
+    ///         "/tmp/rpc-genie/tests/unix_socket_connect_client_doc_test.sock",
     ///         Arc::new(service::Client {
     ///             _request_sender: PhantomData
     ///         })

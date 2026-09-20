@@ -10,6 +10,9 @@ use crate::{
     stream_handler::{self, StreamId},
 };
 
+// TODO it'd be nice if server_stub was private and we generated a Trait for each Server Stubs that
+// is automatically implemented for ClientHandle<StubTypeSpecificToThisTrait, ...>, it would just
+// route the functions calls to self.server_stub.method_name()
 /// The live client connection and the client-side application state.
 ///
 /// The [`service`](crate::service) macro generates an alias for the current service so you never
