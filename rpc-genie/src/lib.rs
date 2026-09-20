@@ -1,4 +1,4 @@
-#![doc = include_str!("../README.md")]
+#![doc = include_str!("../../README.md")]
 
 mod single_request_sender;
 pub use single_request_sender::SingleRequestSender;
@@ -48,7 +48,7 @@ use std::sync::Arc;
 ///             // Server will have one field per sub_services added automatically
 ///             server_name: String,
 ///         }
-///         
+///
 ///         impl<RequestSender> Server<RequestSender> {
 ///             // The #[remote_method] attribute marks this method as being callable from the
 ///             // client
@@ -112,7 +112,7 @@ use std::sync::Arc;
 ///     }
 /// }
 /// ```
-pub use service_macro::service;
+pub use rpc_genie_macros::service;
 
 use crate::{
     frame::{
