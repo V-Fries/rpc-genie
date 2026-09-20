@@ -22,15 +22,50 @@ pub enum Error {
     },
 }
 
-pub struct ServerHandle<Stub>
+/// Handle to a running RPC server.
+///
+/// Dropping the `ServerHandle` aborts the server task and disconnects its clients.
+///
+/// The [`service`](crate::service) macro generates an alias for the current service so you never
+/// have to type out the full type.
+///
+/// # Examples
+/// ```rust
+/// use std::{marker::PhantomData, sync::Arc};
+/// use tokio::net::{TcpStream, TcpListener};
+///
+/// #[rpc_genie::service]
+/// mod service {
+///     pub struct Server<RequestSender> {}
+///     pub struct Client<RequestSender> {}
+/// }
+///
+/// const MAX_FRAME_SIZE: usize = 1024;
+///
+/// #[tokio::main]
+/// async fn main() {
+///     // use the generated alias not the original ServerHandle type (it's way too long)
+///     let server_handle: service::ServerHandle<MAX_FRAME_SIZE, TcpStream> =
+///         rpc_genie::server::start_server::<_, TcpListener, _, _, _, _, _, _, _>(
+///             "127.0.0.1:12323",
+///             Arc::new(service::Server {
+///                 _request_sender: PhantomData,
+///             }
+///         ))
+///         .await
+///         .unwrap();
+/// }
+/// ```
+pub struct ServerHandle<ServerState, Stub>
 where
     Stub: SubscribableStub,
 {
     join_handle: Option<JoinHandle<()>>,
     topic: Arc<Topic<Stub>>,
+    pub state: Arc<ServerState>,
 }
 
-impl<Stub> Drop for ServerHandle<Stub>
+impl<ServerState, Stub> Drop for ServerHandle<ServerState, Stub>
 where
     Stub: SubscribableStub,
 {
@@ -41,10 +76,11 @@ where
     }
 }
 
-impl<Stub> ServerHandle<Stub>
+impl<ServerState, Stub> ServerHandle<ServerState, Stub>
 where
     Stub: SubscribableStub,
 {
+    /// Wait for the server task to stop and return its join result.
     pub async fn wait_until_stopped(mut self) -> Result<(), JoinError> {
         self.join_handle
             .take()
@@ -52,15 +88,20 @@ where
             .await
     }
 
+    /// Stops the server.
+    ///
+    /// Dropping the `ServerHandle` has the same effect as calling this method.
     pub fn stop(self) {
         // routine will be aborted automatically on drop
     }
 }
 
-impl<Stub> ServerHandle<Stub>
+impl<ServerState, Stub> ServerHandle<ServerState, Stub>
 where
     Stub: SubscribableStub,
 {
+    /// Run a callback for every currently connected client concurrently and
+    /// collect each callback's result.
     pub async fn map_each_client<CallbackFuture, FutureOutput>(
         &self,
         callback: impl FnMut(Arc<Stub>) -> CallbackFuture,
@@ -71,6 +112,8 @@ where
         self.topic.map(callback).await
     }
 
+    /// Run a callback for every currently connected client concurrently,
+    /// waiting until all callbacks finish.
     pub async fn for_each_client<CallbackFuture>(
         &self,
         callback: impl FnMut(Arc<Stub>) -> CallbackFuture,
@@ -81,6 +124,14 @@ where
     }
 }
 
+/// Start a server using a listener implementation and return its lifecycle handle.
+///
+/// You probably never want to call this directly, use
+/// [`Tcp::start_server`](crate::Tcp::start_server) /
+/// [`UnixSocket::start_server`](crate::UnixSocket::start_server) instead.
+///
+/// This function is only useful to call manually if you plan on implementing the [`Listener`] and
+/// [`Stream`](crate::client::Stream) traits for a custom transport.
 pub async fn start_server<
     const MAX_FRAME_SIZE: usize,
     Listener,
@@ -94,7 +145,7 @@ pub async fn start_server<
 >(
     addr: Addr,
     server_state: Arc<Server>,
-) -> Result<ServerHandle<ClientStubArcHandle>, Error>
+) -> Result<ServerHandle<Server, ClientStubArcHandle>, Error>
 where
     Listener: listener::Listener<Addr, Stream>,
     Addr: Into<String>,
@@ -122,6 +173,7 @@ where
     let topic = Arc::new(Topic::new().await);
 
     let topic_weak_ref = Arc::downgrade(&topic);
+    let server_state_clone = Arc::clone(&server_state);
     let join_handle = tokio::spawn(async move {
         server_routine::<
             MAX_FRAME_SIZE,
@@ -133,17 +185,18 @@ where
             ClientStubArcHandle,
             ClientStubWeakHandle,
             SubServices,
-        >(listener, server_state, topic_weak_ref)
+        >(listener, server_state_clone, topic_weak_ref)
         .await
     });
 
     Ok(ServerHandle {
         join_handle: Some(join_handle),
         topic,
+        state: server_state,
     })
 }
 
-pub async fn server_routine<
+async fn server_routine<
     const MAX_FRAME_SIZE: usize,
     Listener,
     Addr,
