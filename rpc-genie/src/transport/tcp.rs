@@ -43,18 +43,16 @@ impl<const MAX_FRAME_SIZE: usize> Tcp<MAX_FRAME_SIZE> {
     /// }
     /// ```
     pub async fn start_server<
-        Addr,
         Server,
         RequestHandler,
         ClientStubArcHandle,
         ClientStubWeakHandle,
         SubServices,
     >(
-        addr: Addr,
+        addr: &str,
         server_state: Arc<Server>,
-    ) -> Result<server::ServerHandle<Server, ClientStubArcHandle>, server::Error>
+    ) -> Result<server::ServerHandle<Server, ClientStubArcHandle, TcpListener>, server::Error>
     where
-        Addr: ToSocketAddrs + ToString,
         Server: crate::Server<
                 MAX_FRAME_SIZE,
                 TcpStream,
@@ -71,7 +69,6 @@ impl<const MAX_FRAME_SIZE: usize> Tcp<MAX_FRAME_SIZE> {
         server::start_server::<
             MAX_FRAME_SIZE,
             TcpListener,
-            Addr,
             TcpStream,
             Server,
             RequestHandler,

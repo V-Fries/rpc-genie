@@ -1,18 +1,21 @@
 use std::{io, time::Duration};
 
-use tokio::net::{TcpListener, TcpStream, ToSocketAddrs, UnixListener, UnixStream};
+use tokio::net::{TcpListener, TcpStream, UnixListener, UnixStream};
 
-pub trait Listener<Addr, Stream>: Sized + Send + 'static {
-    fn bind(addr: &Addr) -> impl Future<Output = Result<Self, io::Error>>;
+pub trait Listener: Sized + Send + 'static {
+    type Stream;
 
-    fn accept(&self) -> impl Future<Output = Stream> + Send;
+    fn bind(addr: &str) -> impl Future<Output = Result<Self, io::Error>>;
+
+    fn accept(&self) -> impl Future<Output = Self::Stream> + Send;
+
+    fn on_routine_end(addr: &str);
 }
 
-impl<Path> Listener<Path, UnixStream> for UnixListener
-where
-    Path: AsRef<std::path::Path>,
-{
-    async fn bind(path: &Path) -> Result<Self, io::Error> {
+impl Listener for UnixListener {
+    type Stream = UnixStream;
+
+    async fn bind(path: &str) -> Result<Self, io::Error> {
         Self::bind(path)
     }
 
@@ -24,13 +27,18 @@ where
             }
         }
     }
+
+    fn on_routine_end(path: &str) {
+        if let Err(err) = std::fs::remove_file(path) {
+            eprintln!("Error: Failed to delete unix socket file {path:?}: {err}",)
+        }
+    }
 }
 
-impl<Addr> Listener<Addr, TcpStream> for TcpListener
-where
-    Addr: ToSocketAddrs,
-{
-    async fn bind(addr: &Addr) -> Result<Self, io::Error> {
+impl Listener for TcpListener {
+    type Stream = TcpStream;
+
+    async fn bind(addr: &str) -> Result<Self, io::Error> {
         Self::bind(addr).await
     }
 
@@ -42,6 +50,8 @@ where
             }
         }
     }
+
+    fn on_routine_end(_addr: &str) {}
 }
 
 async fn handle_accept_error(error: io::Error) {
