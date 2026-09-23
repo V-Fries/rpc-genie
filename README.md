@@ -1,5 +1,7 @@
 # rpc-genie
 
+This crate is currently is final stages of testing before publishing version 0.1.0 to crates.io.
+
 ## Typed bidirectional RPC over TCP or Unix sockets
 
 ## Usage:
@@ -221,8 +223,14 @@ async fn client(server_doesnt_need_client_anymore_receiver: oneshot::Receiver<()
 }
 ```
 
+## Planned features:
+
+- Logging (will probably use the [tracing](https://docs.rs/tracing/latest/tracing/) crate)
+- On connect and on disconnect events
+- Request time-out
+- Client auto-reconnect on error
+- Request encryption (for now, use something like wireguard if you transfer data over the net)
+
 ## Limitations:
 
 - Still in early development, breaking changes may often occur
-- Proper logging is not yet implemented
-- On connect and on disconnect events are not yet implemented
