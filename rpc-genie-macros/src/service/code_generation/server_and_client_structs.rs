@@ -45,14 +45,14 @@ impl Service {
             where
                 RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
             {}
-            impl<const MAX_FRAME_SIZE: usize, Stream, RequestSender>
-                #trait_to_implement<MAX_FRAME_SIZE, Stream, RequestSender>
+            impl<Stream, RequestSender>
+                #trait_to_implement<Stream, RequestSender>
                 for #struct_ident<RequestSender>
             where
                 RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
             {
                 type #opposite_stub_arc_handle_type_name =
-                    #opposite_stub_arc_handle_type_name<MAX_FRAME_SIZE, Stream>;
+                    #opposite_stub_arc_handle_type_name<Stream>;
             }
         }
     }

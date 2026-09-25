@@ -48,9 +48,10 @@ pub enum Error {
 /// #[tokio::main]
 /// async fn main() {
 ///     // use the generated alias not the original ServerHandle type (it's way too long)
-///     let server_handle: service::ServerHandle<MAX_FRAME_SIZE, TcpListener> =
-///         rpc_genie::server::start_server::<_, TcpListener, _, _, _, _, _, _>(
+///     let server_handle: service::ServerHandle<TcpListener> =
+///         rpc_genie::server::start_server(
 ///             "127.0.0.1:12323",
+///             MAX_FRAME_SIZE,
 ///             Arc::new(service::Server {
 ///                 _request_sender: PhantomData,
 ///             }
@@ -143,7 +144,6 @@ where
 /// This function is only useful to call manually if you plan on implementing the [`Listener`] and
 /// [`Stream`](crate::client::Stream) traits for a custom transport.
 pub async fn start_server<
-    const MAX_FRAME_SIZE: usize,
     Listener,
     Stream,
     Server,
@@ -153,22 +153,20 @@ pub async fn start_server<
     SubServices,
 >(
     addr: &str,
+    max_frame_size: usize,
     server_state: Arc<Server>,
 ) -> Result<ServerHandle<Server, ClientStubArcHandle, Listener>, Error>
 where
     Listener: listener::Listener<Stream = Stream>,
     Stream: AsyncWrite + AsyncRead + Send + 'static,
     Server: crate::Server<
-            MAX_FRAME_SIZE,
             Stream,
-            Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>,
+            Weak<stream_handler::Handle<Stream>>,
             ClientStubArcHandle = ClientStubArcHandle,
         > + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ClientStubWeakHandle>,
-    ClientStubArcHandle:
-        crate::Stub<Arc<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>> + SubscribableStub,
-    ClientStubWeakHandle:
-        crate::Stub<Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>> + SubscribableStub,
+    ClientStubArcHandle: crate::Stub<Arc<stream_handler::Handle<Stream>>> + SubscribableStub,
+    ClientStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<Stream>>> + SubscribableStub,
     SubServices: SubServicesFromState<Server>,
 {
     let listener = Listener::bind(addr)
@@ -184,7 +182,6 @@ where
     let server_state_clone = Arc::clone(&server_state);
     let join_handle = tokio::spawn(async move {
         server_routine::<
-            MAX_FRAME_SIZE,
             Listener,
             Server,
             Stream,
@@ -192,7 +189,7 @@ where
             ClientStubArcHandle,
             ClientStubWeakHandle,
             SubServices,
-        >(listener, server_state_clone, topic_weak_ref)
+        >(listener, max_frame_size, server_state_clone, topic_weak_ref)
         .await
     });
 
@@ -206,7 +203,6 @@ where
 }
 
 async fn server_routine<
-    const MAX_FRAME_SIZE: usize,
     Listener,
     Server,
     Stream,
@@ -216,21 +212,19 @@ async fn server_routine<
     SubServices,
 >(
     listener: Listener,
+    max_frame_size: usize,
     server_state: Arc<Server>,
     topic: Weak<Topic<ClientStubArcHandle>>,
 ) where
     Listener: listener::Listener<Stream = Stream>,
     Server: crate::Server<
-            MAX_FRAME_SIZE,
             Stream,
-            Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>,
+            Weak<stream_handler::Handle<Stream>>,
             ClientStubArcHandle = ClientStubArcHandle,
         > + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ClientStubWeakHandle>,
-    ClientStubArcHandle:
-        crate::Stub<Arc<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>> + SubscribableStub,
-    ClientStubWeakHandle:
-        crate::Stub<Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>> + SubscribableStub,
+    ClientStubArcHandle: crate::Stub<Arc<stream_handler::Handle<Stream>>> + SubscribableStub,
+    ClientStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<Stream>>> + SubscribableStub,
     SubServices: SubServicesFromState<Server>,
     Stream: AsyncWrite + AsyncRead + Send + 'static,
 {
@@ -252,12 +246,17 @@ async fn server_routine<
         topic
             .subscribe(
                 stream_handler::spawn_server_routine::<
-                    MAX_FRAME_SIZE,
                     Stream,
                     RequestHandler,
                     ClientStubArcHandle,
                     ClientStubWeakHandle,
-                >(client_stream, client_id, request_handler_clone, weak_topic)
+                >(
+                    max_frame_size,
+                    client_stream,
+                    client_id,
+                    request_handler_clone,
+                    weak_topic,
+                )
                 .await,
             )
             .await

@@ -16,7 +16,8 @@ async fn start_test_routine() -> (
 ) {
     let (server_stream, client_stream) = tokio::io::duplex(4096);
 
-    let stub = spawn_client_routine::<MAX_FRAME_SIZE, _, _, TestStubArcHandle, TestStubWeakHandle>(
+    let stub = spawn_client_routine::<_, _, TestStubArcHandle, TestStubWeakHandle>(
+        MAX_FRAME_SIZE,
         server_stream,
         StreamId::next(),
         Arc::new(TestHandler),
@@ -38,13 +39,13 @@ async fn incoming_request_gets_handler_response() {
     let request = request(RpcResponseMode::ExpectsResponseWithId(7.into()));
 
     Frame::RpcRequest(request)
-        .write_frame::<MAX_FRAME_SIZE>(&mut client_writer)
+        .write_frame(&mut client_writer, MAX_FRAME_SIZE)
         .await
         .unwrap();
 
     let response = tokio::time::timeout(
         std::time::Duration::from_secs(1),
-        Frame::read_frame::<MAX_FRAME_SIZE>(&mut client_reader),
+        Frame::read_frame(&mut client_reader, MAX_FRAME_SIZE),
     )
     .await
     .unwrap()
@@ -69,7 +70,7 @@ async fn call_correlates_response_with_request_id() {
 
     let request = tokio::time::timeout(
         std::time::Duration::from_secs(1),
-        Frame::read_frame::<MAX_FRAME_SIZE>(&mut client_reader),
+        Frame::read_frame(&mut client_reader, MAX_FRAME_SIZE),
     )
     .await
     .unwrap()
@@ -87,7 +88,7 @@ async fn call_correlates_response_with_request_id() {
         .response(&"client response")
         .build();
     Frame::RpcResponse(response)
-        .write_frame::<MAX_FRAME_SIZE>(&mut client_writer)
+        .write_frame(&mut client_writer, MAX_FRAME_SIZE)
         .await
         .unwrap();
 
@@ -108,7 +109,7 @@ async fn notify_sends_request_without_response_id() {
 
     let request = tokio::time::timeout(
         std::time::Duration::from_secs(1),
-        Frame::read_frame::<MAX_FRAME_SIZE>(&mut client_reader),
+        Frame::read_frame(&mut client_reader, MAX_FRAME_SIZE),
     )
     .await
     .unwrap()
@@ -134,7 +135,7 @@ async fn stop_resolves_pending_call() {
 
     let _request = tokio::time::timeout(
         std::time::Duration::from_secs(1),
-        Frame::read_frame::<MAX_FRAME_SIZE>(&mut client_reader),
+        Frame::read_frame(&mut client_reader, MAX_FRAME_SIZE),
     )
     .await
     .unwrap()
@@ -163,7 +164,7 @@ async fn peer_disconnect_resolves_pending_call() {
 
     let _request = tokio::time::timeout(
         std::time::Duration::from_secs(1),
-        Frame::read_frame::<MAX_FRAME_SIZE>(&mut client_reader),
+        Frame::read_frame(&mut client_reader, MAX_FRAME_SIZE),
     )
     .await
     .unwrap()

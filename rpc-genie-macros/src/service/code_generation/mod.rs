@@ -160,10 +160,10 @@ fn into_request_handler_impl_blocks() -> TokenStream {
 fn client_handle_alias() -> TokenStream {
     quote! {
         /// Type alias of an `rpc_genie::client::ClientHandle` for this service
-        pub type ClientHandle<const MAX_FRAME_SIZE: usize, Stream>
+        pub type ClientHandle<Stream>
             = rpc_genie::client::ClientHandle<
-                ServerStubArcHandle<MAX_FRAME_SIZE, Stream>,
-                Client<std::sync::Weak<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>>,
+                ServerStubArcHandle<Stream>,
+                Client<std::sync::Weak<rpc_genie::stream_handler::Handle<Stream>>>,
             >;
     }
 }
@@ -171,18 +171,16 @@ fn client_handle_alias() -> TokenStream {
 fn server_handle_alias() -> TokenStream {
     quote! {
         /// Type alias of an `rpc_genie::server::ServerHandle` for this service
-        pub type ServerHandle<const MAX_FRAME_SIZE: usize, Listener>
+        pub type ServerHandle<Listener>
             = rpc_genie::server::ServerHandle<
                 Server<
                     std::sync::Weak<
                         rpc_genie::stream_handler::Handle<
-                            MAX_FRAME_SIZE,
                             <Listener as rpc_genie::server::Listener>::Stream,
                         >
                     >
                 >,
                 ClientStubArcHandle<
-                    MAX_FRAME_SIZE,
                     <Listener as rpc_genie::server::Listener>::Stream
                 >,
                 Listener,

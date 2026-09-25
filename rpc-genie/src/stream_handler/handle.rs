@@ -22,22 +22,23 @@ use crate::{
     topic::{self, StubDiedNotificationSender, TopicId},
 };
 
-pub struct Handle<const MAX_FRAME_SIZE: usize, Stream> {
-    pub(super) state: TokioMutex<State<MAX_FRAME_SIZE, Stream>>,
+pub struct Handle<Stream> {
+    pub(super) state: TokioMutex<State<Stream>>,
     pub(super) stream_id: StreamId,
     pub(super) registered_topics: StdMutex<RegisteredTopics>,
 }
 
-pub(super) enum State<const MAX_FRAME_SIZE: usize, Stream> {
-    Running(RunningState<MAX_FRAME_SIZE, Stream>),
+pub(super) enum State<Stream> {
+    Running(RunningState<Stream>),
     Stopped(StopReason),
 }
 
-pub(super) struct RunningState<const MAX_FRAME_SIZE: usize, Stream> {
+pub(super) struct RunningState<Stream> {
     pub(super) kill_routine_sender: KillRoutineSender,
     pub(super) request_map: Arc<TokioMutex<HashMap<RpcRequestId, ResponseSender>>>,
     pub(super) next_request_id: u64,
     pub(super) buf_writer: Arc<TokioMutex<BufWriter<WriteHalf<Stream>>>>,
+    pub(super) max_frame_size: usize,
 }
 
 #[derive(Default)]
@@ -105,7 +106,7 @@ pub enum StopReason {
     HandleWasDropped,
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> Handle<MAX_FRAME_SIZE, Stream> {
+impl<Stream> Handle<Stream> {
     pub(super) async fn stop_with(&self, stop_reason: StopReason) {
         self.state.lock().await.stop_with(stop_reason).await;
         self.send_death_notifications_to_topics();
@@ -121,13 +122,13 @@ impl<const MAX_FRAME_SIZE: usize, Stream> Handle<MAX_FRAME_SIZE, Stream> {
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> Drop for Handle<MAX_FRAME_SIZE, Stream> {
+impl<Stream> Drop for Handle<Stream> {
     fn drop(&mut self) {
         self.send_death_notifications_to_topics();
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> Drop for RunningState<MAX_FRAME_SIZE, Stream> {
+impl<Stream> Drop for RunningState<Stream> {
     fn drop(&mut self) {
         // Ignore result as the routine could end before we drop the handles. ie.e the receiver is
         // dropped
@@ -137,7 +138,7 @@ impl<const MAX_FRAME_SIZE: usize, Stream> Drop for RunningState<MAX_FRAME_SIZE, 
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> SendRequest for Arc<Handle<MAX_FRAME_SIZE, Stream>>
+impl<Stream> SendRequest for Arc<Handle<Stream>>
 where
     Stream: AsyncWrite + Send + 'static,
 {
@@ -156,7 +157,7 @@ where
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> SendRequest for Weak<Handle<MAX_FRAME_SIZE, Stream>>
+impl<Stream> SendRequest for Weak<Handle<Stream>>
 where
     Stream: AsyncWrite + Send + 'static,
 {
@@ -183,7 +184,7 @@ where
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> Handle<MAX_FRAME_SIZE, Stream>
+impl<Stream> Handle<Stream>
 where
     Stream: AsyncWrite + Send + 'static,
 {
@@ -260,8 +261,8 @@ where
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> State<MAX_FRAME_SIZE, Stream> {
-    fn running_state(&mut self) -> Result<&mut RunningState<MAX_FRAME_SIZE, Stream>, &StopReason> {
+impl<Stream> State<Stream> {
+    fn running_state(&mut self) -> Result<&mut RunningState<Stream>, &StopReason> {
         match self {
             State::Running(state) => Ok(state),
             State::Stopped(stop_reason) => Err(stop_reason),
@@ -303,7 +304,7 @@ impl<const MAX_FRAME_SIZE: usize, Stream> State<MAX_FRAME_SIZE, Stream> {
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> RunningState<MAX_FRAME_SIZE, Stream>
+impl<Stream> RunningState<Stream>
 where
     Stream: AsyncWrite + Send + 'static,
 {
@@ -329,13 +330,12 @@ where
 
     async fn write_frame(&self, request: RpcRequest) -> Result<(), frame::WriteError> {
         Frame::RpcRequest(request)
-            .write_frame::<MAX_FRAME_SIZE>(&mut *self.buf_writer.lock().await)
+            .write_frame(&mut *self.buf_writer.lock().await, self.max_frame_size)
             .await
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub
-    for Arc<Handle<MAX_FRAME_SIZE, Stream>>
+impl<Stream> crate::SubscribableStub for Arc<Handle<Stream>>
 where
     Stream: Send,
 {
@@ -358,8 +358,7 @@ where
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub
-    for Weak<Handle<MAX_FRAME_SIZE, Stream>>
+impl<Stream> crate::SubscribableStub for Weak<Handle<Stream>>
 where
     Stream: Send,
 {
@@ -391,7 +390,7 @@ where
     }
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream> crate::SubscribableStub for Handle<MAX_FRAME_SIZE, Stream>
+impl<Stream> crate::SubscribableStub for Handle<Stream>
 where
     Stream: Send,
 {
