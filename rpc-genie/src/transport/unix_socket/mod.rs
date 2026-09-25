@@ -21,8 +21,8 @@ use crate::{
 ///
 /// #[rpc_genie::service]
 /// mod service {
-///     pub struct Server<RequestSender> {}
-///     pub struct Client<RequestSender> {}
+///     pub struct Server<Stream> {}
+///     pub struct Client<Stream> {}
 /// }
 ///
 /// const MAX_FRAME_SIZE: usize = 1024 * 1024;
@@ -34,7 +34,7 @@ use crate::{
 ///         "/tmp/rpc-genie/tests/unix_socket_start_server_doc_test.sock",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Server {
-///             _request_sender: PhantomData
+///             _stream: PhantomData
 ///         })
 ///     )
 ///     .await
@@ -53,11 +53,8 @@ pub async fn start_server<
     server_state: Arc<Server>,
 ) -> Result<server::ServerHandle<Server, ClientStubArcHandle, UnixListener>, server::Error>
 where
-    Server: crate::Server<
-            UnixStream,
-            Weak<stream_handler::Handle<UnixStream>>,
-            ClientStubArcHandle = ClientStubArcHandle,
-        > + IntoRequestHandler<RequestHandler, SubServices>,
+    Server: crate::Server<UnixStream, ClientStubArcHandle = ClientStubArcHandle>
+        + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ClientStubWeakHandle>,
     ClientStubArcHandle: crate::Stub<Arc<stream_handler::Handle<UnixStream>>> + SubscribableStub,
     ClientStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<UnixStream>>> + SubscribableStub,
@@ -83,8 +80,8 @@ where
 ///
 /// #[rpc_genie::service]
 /// mod service {
-///     pub struct Server<RequestSender> {}
-///     pub struct Client<RequestSender> {}
+///     pub struct Server<Stream> {}
+///     pub struct Client<Stream> {}
 /// }
 ///
 /// const MAX_FRAME_SIZE: usize = 1024 * 1024;
@@ -95,7 +92,7 @@ where
 ///         "/tmp/rpc-genie/tests/unix_socket_connect_client_doc_test.sock",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Client {
-///             _request_sender: PhantomData
+///             _stream: PhantomData
 ///         })
 ///     ).await;
 /// }
@@ -114,11 +111,8 @@ pub async fn connect_client<
 ) -> Result<ClientHandle<ServerStubArcHandle, Client>, client::Error>
 where
     Path: AsRef<std::path::Path> + Into<String>,
-    Client: crate::Client<
-            UnixStream,
-            Weak<stream_handler::Handle<UnixStream>>,
-            ServerStubArcHandle = ServerStubArcHandle,
-        > + IntoRequestHandler<RequestHandler, SubServices>,
+    Client: crate::Client<UnixStream, ServerStubArcHandle = ServerStubArcHandle>
+        + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ServerStubWeakHandle>,
     ServerStubArcHandle: crate::Stub<Arc<stream_handler::Handle<UnixStream>>>,
     ServerStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<UnixStream>>> + SubscribableStub,

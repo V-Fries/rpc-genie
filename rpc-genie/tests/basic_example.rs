@@ -1,4 +1,4 @@
-// To see the generated code, you can run `cargo expand --test basic_example`
+// To see the generated code, you can run `cargo expand --manifest-path rpc-genie/Cargo.toml --test basic_example`
 
 #[rpc_genie::service]
 pub mod service_a {
@@ -11,11 +11,11 @@ pub mod service_a {
         pub sub_service_2: super::service_b,
     }
 
-    pub struct Server<RequestSender> {
+    pub struct Server<Stream> {
         pub name: String,
     }
 
-    impl<RequestSender> Server<RequestSender> {
+    impl<Stream> Server<Stream> {
         // pass &self for stateful functions (use mutexes and other solutions for mutability)
         #[remote_method]
         pub fn server_name(&self) -> String {
@@ -50,11 +50,11 @@ pub mod service_a {
         }
     }
 
-    pub struct Client<RequestSender> {
+    pub struct Client<Stream> {
         pub count: AtomicU32,
     }
 
-    impl<RequestSender> Client<RequestSender> {
+    impl<Stream> Client<Stream> {
         // You can also define remote methods on the client. These will be callable from the server
         #[remote_method]
         pub fn increment_count(&self) -> u32 {
@@ -65,13 +65,13 @@ pub mod service_a {
 
 #[rpc_genie::service]
 mod service_b {
-    pub struct Server<RequestSender> {
+    pub struct Server<Stream> {
         pub some_state: u32,
     }
 
-    pub struct Client<RequestSender> {}
+    pub struct Client<Stream> {}
 
-    impl<RequestSender> Client<RequestSender> {
+    impl<Stream> Client<Stream> {
         #[remote_method]
         pub fn add(a: u32, b: u32) -> u32 {
             a + b
@@ -109,21 +109,23 @@ async fn server(
 ) {
     use std::sync::Arc;
 
-    let server_handle = rpc_genie::Tcp::<1024>::start_server(
+    let server_handle = rpc_genie::tcp::start_server(
         // The port can be any available port, but it must match the port used by the client
         "127.0.0.1:51234",
+        // max frame size
+        1024,
         Arc::new(service_a::Server {
             name: "server".to_string(),
             // Here we see that the sub services state are added to the main service state
             sub_service_1: Arc::new(service_b::Server {
                 some_state: 1,
-                _request_sender: std::marker::PhantomData,
+                _stream: std::marker::PhantomData,
             }),
             // If you wanted, you could pass a clone of the Arc of sub_service_1, that way they
             // would share their state
             sub_service_2: Arc::new(service_b::Server {
                 some_state: 2,
-                _request_sender: std::marker::PhantomData,
+                _stream: std::marker::PhantomData,
             }),
         }),
     )
@@ -139,7 +141,7 @@ async fn server(
 }
 
 async fn server_tests(
-    server_handle: service_a::ServerHandle<1024, tokio::net::TcpStream>,
+    server_handle: service_a::ServerHandle<tokio::net::TcpListener>,
     client_disconnected_receiver: tokio::sync::oneshot::Receiver<()>,
     server_doesnt_need_client_anymore_sender: tokio::sync::oneshot::Sender<()>,
 ) {
@@ -195,17 +197,19 @@ async fn client(
 
     let client_handle = tokio::time::timeout(std::time::Duration::from_secs(1), async {
         loop {
-            if let Ok(client_handle) = rpc_genie::Tcp::<1024>::connect_client(
+            if let Ok(client_handle) = rpc_genie::tcp::connect_client(
                 // The port can be any available port, but it must match the port used by the server
                 "127.0.0.1:51234",
+                // max frame size
+                1024,
                 Arc::new(service_a::Client {
                     count: AtomicU32::new(0),
                     // Here we see that the sub services state are added to the main service state
                     sub_service_1: Arc::new(service_b::Client {
-                        _request_sender: std::marker::PhantomData,
+                        _stream: std::marker::PhantomData,
                     }),
                     sub_service_2: Arc::new(service_b::Client {
-                        _request_sender: std::marker::PhantomData,
+                        _stream: std::marker::PhantomData,
                     }),
                 }),
             )
@@ -227,7 +231,7 @@ async fn client(
 }
 
 async fn client_tests(
-    client_handle: service_a::ClientHandle<1024, tokio::net::TcpStream>,
+    client_handle: service_a::ClientHandle<tokio::net::TcpStream>,
     client_disconnected_sender: tokio::sync::oneshot::Sender<()>,
     server_doesnt_need_client_anymore_receiver: tokio::sync::oneshot::Receiver<()>,
 ) {

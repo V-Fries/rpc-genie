@@ -151,14 +151,14 @@ macro_rules! expect_error {
 fn error_if_remote_method_is_const() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl Server<RequestSender> {
+            impl Server<Stream> {
                 #[remote_method]
                 const fn bar() {}
             }
 
-            struct Client<RequestSender> {}
+            struct Client<Stream> {}
         }
     };
     expect_error!(
@@ -172,14 +172,14 @@ fn error_if_remote_method_is_const() {
 fn error_if_remote_method_is_unsafe() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl Server<RequestSender> {
+            impl Server<Stream> {
                 #[remote_method]
                 unsafe fn bar() {}
             }
 
-            struct Client<RequestSender> {}
+            struct Client<Stream> {}
         }
     };
     expect_error!(service, "Remote methods may not be unsafe");
@@ -189,14 +189,14 @@ fn error_if_remote_method_is_unsafe() {
 fn error_if_remote_method_has_generic_params() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl Server<RequestSender> {
+            impl Server<Stream> {
                 #[remote_method]
                 fn bar<T>() {}
             }
 
-            struct Client<RequestSender> {}
+            struct Client<Stream> {}
         }
     };
     expect_error!(service, "Remote methods may not have generic parameters");
@@ -206,16 +206,16 @@ fn error_if_remote_method_has_generic_params() {
 fn error_if_remote_method_has_where_clause() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl Server<RequestSender> {
+            impl Server<Stream> {
                 #[remote_method]
                 fn bar()
                 where
                 {}
             }
 
-            struct Client<RequestSender> {}
+            struct Client<Stream> {}
         }
     };
     expect_error!(service, "Remote methods may not have a where clause");
@@ -225,14 +225,14 @@ fn error_if_remote_method_has_where_clause() {
 fn error_if_remote_method_has_variadic_param() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl Server<RequestSender> {
+            impl Server<Stream> {
                 #[remote_method]
                 fn bar(...) {}
             }
 
-            struct Client<RequestSender> {}
+            struct Client<Stream> {}
         }
     };
     expect_error!(service, "Remote methods may not have variadic arguments");
@@ -242,8 +242,8 @@ fn error_if_remote_method_has_variadic_param() {
 fn error_if_duplicate_server() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender>;
-            struct Server<RequestSender>;
+            struct Server<Stream>;
+            struct Server<Stream>;
         }
     };
     expect_error!(service, "Server struct was already defined");
@@ -253,8 +253,8 @@ fn error_if_duplicate_server() {
 fn error_if_duplicate_client() {
     let service = quote! {
         mod foo {
-            struct Client<RequestSender>;
-            struct Client<RequestSender>;
+            struct Client<Stream>;
+            struct Client<Stream>;
         }
     };
     expect_error!(service, "Client struct was already defined");
@@ -268,7 +268,7 @@ fn error_if_sub_services_name_is_also_a_server_field_name() {
                 test: super::bar
             }
 
-            struct Server<RequestSender> { test: u32 }
+            struct Server<Stream> { test: u32 }
         }
     };
     expect_error!(
@@ -285,7 +285,7 @@ fn error_if_sub_services_name_is_also_a_client_field_name() {
                 test: super::bar
             }
 
-            struct Client<RequestSender> { test: u32 }
+            struct Client<Stream> { test: u32 }
         }
     };
     expect_error!(
@@ -345,9 +345,9 @@ fn error_if_service_on_something_other_than_a_module() {
 fn error_if_remote_method_is_not_the_only_attribute() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl<RequestSender> Server<RequestSender> {
+            impl<Stream> Server<Stream> {
                 #[foo]
                 #[remote_method]
                 fn foo() {}
@@ -365,10 +365,10 @@ fn error_if_remote_method_is_not_the_only_attribute() {
 fn error_if_remote_method_block_has_an_attribute() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
             #[foo]
-            impl<RequestSender> Server<RequestSender> {
+            impl<Stream> Server<Stream> {
                 #[remote_method]
                 fn foo() {}
             }
@@ -386,7 +386,7 @@ fn error_if_remote_method_block_has_an_attribute() {
 fn error_if_server_struct_is_missing() {
     let service = quote! {
         mod foo {
-            struct Client<RequestSender> {}
+            struct Client<Stream> {}
         }
     };
     expect_error!(
@@ -399,7 +399,7 @@ fn error_if_server_struct_is_missing() {
 fn error_if_client_struct_is_missing() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
         }
     };
     expect_error!(
@@ -412,9 +412,9 @@ fn error_if_client_struct_is_missing() {
 fn error_if_remote_method_attr_is_present_multiple_times() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl<RequestSender> Server<RequestSender> {
+            impl<Stream> Server<Stream> {
                 #[remote_method]
                 #[remote_method]
                 fn foo() {}
@@ -471,9 +471,9 @@ fn error_if_no_module_body() {
 fn error_if_remote_method_has_arguments() {
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl<RequestSender> Server<RequestSender> {
+            impl<Stream> Server<Stream> {
                 #[remote_method(42)]
                 fn foo() {}
             }
@@ -483,9 +483,9 @@ fn error_if_remote_method_has_arguments() {
 
     let service = quote! {
         mod foo {
-            struct Server<RequestSender> {}
+            struct Server<Stream> {}
 
-            impl<RequestSender> Server<RequestSender> {
+            impl<Stream> Server<Stream> {
                 #[remote_method{name = "foo"}]
                 fn foo() {}
             }
@@ -502,18 +502,18 @@ fn with_sub_service() {
                 pub counter: super::counter,
             }
 
-            pub struct Server<RequestSender> {
+            pub struct Server<Stream> {
                 pub server_name: String,
             }
 
-            impl<RequestSender> Server<RequestSender> {
+            impl<Stream> Server<Stream> {
                 #[remote_method]
                 async fn get_server_name(&self) -> String {
                     self.server_name.clone()
                 }
             }
 
-            pub struct Client<RequestSender> {}
+            pub struct Client<Stream> {}
         }
     };
 
@@ -560,12 +560,12 @@ fn with_client_stub() {
     let service = quote! {
         #[rpc_genie::service]
         pub mod counter {
-            pub struct Server<RequestSender> {
+            pub struct Server<Stream> {
                 pub count: tokio::sync::Mutex<u32>,
                 pub subscribed_clients: rpc_genie::SubscribedClients<Client>,
             }
 
-            impl<RequestSender> Server<RequestSender> {
+            impl<Stream> Server<Stream> {
                 #[remote_method]
                 async fn increment(&self) {
                     let new_value = {
@@ -604,11 +604,11 @@ fn with_client_stub() {
                 }
             }
 
-            pub struct Client<RequestSender> {
+            pub struct Client<Stream> {
                 pub current_count: tokio::sync::Mutex<u32>,
             }
 
-            impl<RequestSender> Client<RequestSender> {
+            impl<Stream> Client<Stream> {
                 #[remote_method]
                 async fn change_event(&self, new_value: u32) {
                     *self.current_count.lock().await = new_value;

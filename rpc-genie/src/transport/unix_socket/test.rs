@@ -6,8 +6,8 @@ const MAX_FRAME_SIZE: usize = 1024;
 mod service {
     use crate as rpc_genie;
 
-    pub struct Server<RequestSender> {}
-    pub struct Client<RequestSender> {}
+    pub struct Server<Stream> {}
+    pub struct Client<Stream> {}
 }
 
 #[tokio::test]
@@ -19,7 +19,7 @@ async fn clean_up_socket_file() {
         socket_file_path,
         MAX_FRAME_SIZE,
         Arc::new(service::Server {
-            _request_sender: PhantomData,
+            _stream: PhantomData,
         }),
     )
     .await
