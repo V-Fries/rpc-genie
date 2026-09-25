@@ -34,11 +34,11 @@ mod rpc_request {
             .add_param(&"string")
             .build();
         Frame::RpcRequest(rpc_request)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        let rpc_request = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_request = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -71,11 +71,11 @@ mod rpc_request {
             .response_mode(RpcResponseMode::ExpectsResponseWithId(1.into()))
             .build();
         Frame::RpcRequest(rpc_request)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        let rpc_request = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_request = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -101,7 +101,7 @@ mod rpc_request {
             .add_param(&"string")
             .build();
         Frame::RpcRequest(rpc_request)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
@@ -110,11 +110,11 @@ mod rpc_request {
             .response_mode(RpcResponseMode::ExpectsResponseWithId(1.into()))
             .build();
         Frame::RpcRequest(rpc_request)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        let rpc_request_1 = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_request_1 = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -123,7 +123,7 @@ mod rpc_request {
         };
         let mut rpc_request_reader_1 = RpcRequestArgReader::from(rpc_request_1.args);
 
-        let rpc_request_2 = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_request_2 = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -162,11 +162,11 @@ mod rpc_response {
             .response(&return_value)
             .build();
         Frame::RpcResponse(response)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        let rpc_response = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_response = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -184,11 +184,11 @@ mod rpc_response {
 
         let response = RpcResponse::builder().id(1.into()).response(&()).build();
         Frame::RpcResponse(response)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        let rpc_response = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_response = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -209,17 +209,17 @@ mod rpc_response {
             .response(&"test")
             .build();
         Frame::RpcResponse(response)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
         let response = RpcResponse::builder().id(1.into()).response(&()).build();
         Frame::RpcResponse(response)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        let rpc_response_1: RpcResponse = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_response_1: RpcResponse = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -227,7 +227,7 @@ mod rpc_response {
             _ => panic!("Received unexpected frame"),
         };
 
-        let rpc_response_2: RpcResponse = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_response_2: RpcResponse = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -251,11 +251,11 @@ mod rpc_response {
             .error(RpcResponseError::MethodNotFound)
             .build();
         Frame::RpcResponse(response)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        let rpc_response: RpcResponse = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut stream_2)
+        let rpc_response: RpcResponse = match Frame::read_frame(&mut stream_2, MAX_FRAME_SIZE)
             .await
             .unwrap()
         {
@@ -284,7 +284,7 @@ mod max_size_check {
             .add_param(&42)
             .build();
         match Frame::RpcRequest(request)
-            .write_frame::<1>(&mut stream_1)
+            .write_frame(&mut stream_1, 1)
             .await
             .unwrap_err()
         {
@@ -303,11 +303,11 @@ mod max_size_check {
             .add_param(&42)
             .build();
         Frame::RpcRequest(request)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        match Frame::read_frame::<3>(&mut stream_2).await.unwrap_err() {
+        match Frame::read_frame(&mut stream_2, 3).await.unwrap_err() {
             ReadError::FrameTooBig { size: _, max_size } => assert_eq!(max_size, 3),
             other => println!("Unexpected error: {other:?}"),
         }
@@ -322,7 +322,7 @@ mod max_size_check {
             .response(&"test")
             .build();
         match Frame::RpcResponse(response)
-            .write_frame::<1>(&mut stream_1)
+            .write_frame(&mut stream_1, 1)
             .await
             .unwrap_err()
         {
@@ -340,11 +340,11 @@ mod max_size_check {
             .response(&"test")
             .build();
         Frame::RpcResponse(response)
-            .write_frame::<MAX_FRAME_SIZE>(&mut stream_1)
+            .write_frame(&mut stream_1, MAX_FRAME_SIZE)
             .await
             .unwrap();
 
-        match Frame::read_frame::<3>(&mut stream_2).await.unwrap_err() {
+        match Frame::read_frame(&mut stream_2, 3).await.unwrap_err() {
             ReadError::FrameTooBig { size: _, max_size } => assert_eq!(max_size, 3),
             other => println!("Unexpected error: {other:?}"),
         }

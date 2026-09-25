@@ -16,7 +16,7 @@ pub mod topic;
 pub use topic::Topic;
 
 mod transport;
-pub use transport::{Tcp, UnixSocket};
+pub use transport::{tcp, unix_socket};
 
 #[doc(hidden)]
 pub mod frame;
@@ -180,7 +180,7 @@ pub trait State: Send + Sync + 'static {}
 ///
 /// It is used to identify a struct as a Client to check at compile time that you don't pass a
 /// client state to a function that expects a server state.
-pub trait Client<const MAX_FRAME_SIZE: usize, Stream, ServerStubWeakHandle>: State {
+pub trait Client<Stream, ServerStubWeakHandle>: State {
     /// The generated, owning stub used to make requests to the server.
     type ServerStubArcHandle;
 }
@@ -189,7 +189,7 @@ pub trait Client<const MAX_FRAME_SIZE: usize, Stream, ServerStubWeakHandle>: Sta
 ///
 /// It is used to identify a struct as a Server to check at compile time that you don't pass a
 /// server state to a function that expects a client state.
-pub trait Server<const MAX_FRAME_SIZE: usize, Stream, ClientStubWeakHandle>: State {
+pub trait Server<Stream, ClientStubWeakHandle>: State {
     /// The generated, owning stub used to make requests to a connected client.
     type ClientStubArcHandle;
 }

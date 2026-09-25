@@ -32,8 +32,9 @@ use crate::{
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let Ok(client_handle) = rpc_genie::Tcp::<MAX_FRAME_SIZE>::connect_client(
+///     let Ok(client_handle) = rpc_genie::tcp::connect_client(
 ///         "127.0.0.1:12345",
+///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Client {
 ///             _request_sender: PhantomData
 ///         })

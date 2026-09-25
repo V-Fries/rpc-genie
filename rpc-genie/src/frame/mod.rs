@@ -29,18 +29,19 @@ impl Frame {
     /// This method is not cancellation safe. If the method is used as the
     /// event in a [`tokio::select!`] statement and some
     /// other branch completes first, then some data may have already been written.
-    pub async fn write_frame<const MAX_FRAME_SIZE: usize>(
+    pub async fn write_frame(
         self,
         stream: &mut BufWriter<impl AsyncWrite + Unpin>,
+        max_frame_size: usize,
     ) -> Result<(), WriteError> {
         let data = rmp_serde::to_vec(&self).map_err(|err| WriteError::SerializeFrame {
             serialize_error: err.to_string(),
         })?;
 
-        if data.len() > MAX_FRAME_SIZE {
+        if data.len() > max_frame_size {
             return Err(WriteError::FrameTooBig {
                 size: data.len(),
-                max_size: MAX_FRAME_SIZE,
+                max_size: max_frame_size,
             });
         }
 
@@ -66,8 +67,9 @@ impl Frame {
     /// This method is not cancellation safe. If the method is used as the
     /// event in a [`tokio::select!`] statement and some
     /// other branch completes first, then some data may be lost.
-    pub async fn read_frame<const MAX_FRAME_SIZE: usize>(
+    pub async fn read_frame(
         stream: &mut BufReader<impl AsyncRead + Unpin>,
+        max_frame_size: usize,
     ) -> Result<Self, ReadError> {
         let size = stream
             .read_u64()
@@ -76,10 +78,10 @@ impl Frame {
                 io_error: err.to_string(),
             })? as usize;
 
-        if size > MAX_FRAME_SIZE {
+        if size > max_frame_size {
             return Err(ReadError::FrameTooBig {
                 size,
-                max_size: MAX_FRAME_SIZE,
+                max_size: max_frame_size,
             });
         }
 

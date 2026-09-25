@@ -13,7 +13,7 @@ use super::*;
 const MAX_FRAME_SIZE: usize = 1024;
 
 type TestStream = tokio::io::DuplexStream;
-type TestHandle = super::Handle<MAX_FRAME_SIZE, TestStream>;
+type TestHandle = super::Handle<TestStream>;
 
 struct TestStubWeakHandle(Weak<TestHandle>);
 

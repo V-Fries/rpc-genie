@@ -129,8 +129,9 @@ async fn main() {
 }
 
 async fn server(server_doesnt_need_client_anymore_sender: oneshot::Sender<()>) {
-    let server_handle = rpc_genie::Tcp::<MAX_FRAME_SIZE>::start_server(
+    let server_handle = rpc_genie::tcp::start_server(
         ADDR,
+        MAX_FRAME_SIZE,
         Arc::new(services::a::Server {
             server_name: "server".to_string(),
             // Here we see that the sub services state are added to the parent service state
@@ -179,8 +180,9 @@ async fn server(server_doesnt_need_client_anymore_sender: oneshot::Sender<()>) {
 async fn client(server_doesnt_need_client_anymore_receiver: oneshot::Receiver<()>) {
     let client_handle = tokio::time::timeout(Duration::from_secs(1), async {
         loop {
-            let result = rpc_genie::Tcp::<MAX_FRAME_SIZE>::connect_client(
+            let result = rpc_genie::tcp::connect_client(
                 ADDR,
+                MAX_FRAME_SIZE,
                 Arc::new(services::a::Client {
                     // Here we see that the sub services state are added to the parent service state
                     message_publisher: Arc::new(services::message_publisher::Client {

@@ -56,14 +56,14 @@ impl Service {
                 #sub_services_stub_fields
             }
 
-            pub type #stub_arc_handle_type_name<const MAX_FRAME_SIZE: usize, Stream> =
+            pub type #stub_arc_handle_type_name<Stream> =
                 #generic_stub_struct_name<
-                    std::sync::Arc<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>
+                    std::sync::Arc<rpc_genie::stream_handler::Handle<Stream>>
                 >;
 
-            pub type #stub_weak_handle_type_name<const MAX_FRAME_SIZE: usize, Stream> =
+            pub type #stub_weak_handle_type_name<Stream> =
                 #generic_stub_struct_name<
-                    std::sync::Weak<rpc_genie::stream_handler::Handle<MAX_FRAME_SIZE, Stream>>
+                    std::sync::Weak<rpc_genie::stream_handler::Handle<Stream>>
                 >;
 
 

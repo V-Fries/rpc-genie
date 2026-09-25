@@ -21,26 +21,26 @@ use crate::{
     },
 };
 
-pub(super) struct Routine<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, WeakOppositeStub> {
+pub(super) struct Routine<Stream, RequestHandler, WeakOppositeStub> {
     pub stream_id: StreamId,
     pub request_handler: Arc<RequestHandler>,
     pub request_map: Arc<Mutex<HashMap<RpcRequestId, ResponseSender>>>,
-    pub handle: Weak<super::Handle<MAX_FRAME_SIZE, Stream>>,
+    pub handle: Weak<super::Handle<Stream>>,
     pub opposite_stub_weak_handle: Arc<WeakOppositeStub>,
 }
 
-impl<const MAX_FRAME_SIZE: usize, Stream, RequestHandler, WeakOppositeStub>
-    Routine<MAX_FRAME_SIZE, Stream, RequestHandler, WeakOppositeStub>
+impl<Stream, RequestHandler, WeakOppositeStub> Routine<Stream, RequestHandler, WeakOppositeStub>
 where
     Stream: AsyncWrite + AsyncRead + Send + 'static,
     RequestHandler: HandleRequest<WeakOppositeStub>,
-    WeakOppositeStub: crate::Stub<Weak<super::Handle<MAX_FRAME_SIZE, Stream>>>,
+    WeakOppositeStub: crate::Stub<Weak<super::Handle<Stream>>>,
 {
     pub async fn routine(
         self,
         mut kill_routine_receiver: KillRoutineReceiver,
         read_stream: ReadHalf<Stream>,
         buf_writer: Arc<Mutex<BufWriter<WriteHalf<Stream>>>>,
+        max_frame_size: usize,
     ) where
         Stream: AsyncWrite + AsyncRead + Send + 'static,
     {
@@ -59,6 +59,7 @@ where
             () = self.frame_handler_loop(
                 BufReader::new(read_stream),
                 Arc::clone(&buf_writer),
+                max_frame_size,
             ) => {
                 // frame_handler_loop only returns on error, we don't send the disconnect frame on
                 // error
@@ -71,7 +72,7 @@ where
         if let ShouldSendDisconnectFrame::Yes = should_send_disconnect_msg {
             // TODO log error
             let _ = Frame::Disconnected
-                .write_frame::<MAX_FRAME_SIZE>(&mut *buf_writer.lock().await)
+                .write_frame(&mut *buf_writer.lock().await, max_frame_size)
                 .await;
         }
     }
@@ -84,11 +85,12 @@ where
         self,
         mut buf_reader: BufReader<ReadHalf<Stream>>,
         buf_writer: Arc<Mutex<BufWriter<WriteHalf<Stream>>>>,
+        max_frame_size: usize,
     ) where
         Stream: AsyncWrite + AsyncRead + Send + 'static,
     {
         loop {
-            let frame = match Frame::read_frame::<MAX_FRAME_SIZE>(&mut buf_reader).await {
+            let frame = match Frame::read_frame(&mut buf_reader, max_frame_size).await {
                 Ok(frame) => frame,
                 Err(err) => {
                     eprintln!(
@@ -126,6 +128,7 @@ where
                             handle_clone,
                             stub_clone,
                             buf_writer_clone,
+                            max_frame_size,
                         )
                         .await
                     });
@@ -139,9 +142,10 @@ where
         stream_id: StreamId,
         request_handler: Arc<RequestHandler>,
         request: RpcRequest,
-        handle: Weak<super::Handle<MAX_FRAME_SIZE, Stream>>,
+        handle: Weak<super::Handle<Stream>>,
         weak_opposite_stub: Arc<WeakOppositeStub>,
         buf_writer: Arc<Mutex<BufWriter<WriteHalf<Stream>>>>,
+        max_frame_size: usize,
     ) where
         Stream: AsyncWrite,
     {
@@ -163,7 +167,7 @@ where
         let response = response_builder.id(rpc_request_id).build();
 
         let write_result = Frame::RpcResponse(response)
-            .write_frame::<MAX_FRAME_SIZE>(buf_writer.lock().await.deref_mut())
+            .write_frame(buf_writer.lock().await.deref_mut(), max_frame_size)
             .await;
 
         match write_result {

@@ -35,13 +35,16 @@ use crate::{
 /// async fn main() {
 ///     let result: Result<
 ///             // use the generated alias not the original ClientHandle type (it's way too long)
-///             service::ClientHandle<MAX_FRAME_SIZE, TcpStream>,
+///             service::ClientHandle<TcpStream>,
 ///             rpc_genie::client::Error,
 ///         > =
-///         rpc_genie::client::connect_client("127.0.0.1:12323", Arc::new(service::Client {
-///             _request_sender: PhantomData,
-///         }
-///     )).await;
+///         rpc_genie::client::connect_client(
+///             "127.0.0.1:12323",
+///             MAX_FRAME_SIZE,
+///             Arc::new(service::Client {
+///                 _request_sender: PhantomData,
+///             })
+///         ).await;
 /// }
 /// ```
 pub struct ClientHandle<Stub, Client> {
@@ -77,7 +80,6 @@ impl<Stub, Client> ClientHandle<Stub, Client> {
 /// This function is only useful to call manually if you plan on implementing the
 /// [`Listener`](crate::server::Listener) and [`Stream`] traits for a custom transport.
 pub async fn connect_client<
-    const MAX_FRAME_SIZE: usize,
     Addr,
     Stream,
     Client,
@@ -87,20 +89,20 @@ pub async fn connect_client<
     SubServices,
 >(
     addr: Addr,
+    max_frame_size: usize,
     client_state: Arc<Client>,
 ) -> Result<ClientHandle<ServerStubArcHandle, Client>, Error>
 where
     Stream: stream::Stream<Addr> + AsyncWrite + AsyncRead + Send + 'static,
     Addr: Into<String>,
     Client: crate::Client<
-            MAX_FRAME_SIZE,
             Stream,
-            Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>,
+            Weak<stream_handler::Handle<Stream>>,
             ServerStubArcHandle = ServerStubArcHandle,
         > + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ServerStubWeakHandle>,
-    ServerStubArcHandle: crate::Stub<Arc<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>>,
-    ServerStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<MAX_FRAME_SIZE, Stream>>>,
+    ServerStubArcHandle: crate::Stub<Arc<stream_handler::Handle<Stream>>>,
+    ServerStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<Stream>>>,
     SubServices: SubServicesFromState<Client>,
 {
     let stream = Stream::connect(&addr)
@@ -114,12 +116,11 @@ where
 
     Ok(ClientHandle {
         server_stub: stream_handler::spawn_client_routine::<
-            MAX_FRAME_SIZE,
             Stream,
             RequestHandler,
             ServerStubArcHandle,
             ServerStubWeakHandle,
-        >(stream, stream_id, request_handler)
+        >(max_frame_size, stream, stream_id, request_handler)
         .await,
         state: client_state,
     })
