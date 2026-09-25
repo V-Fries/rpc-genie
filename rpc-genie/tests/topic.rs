@@ -1,11 +1,11 @@
 #[rpc_genie::service]
 mod counter {
-    pub struct Server<RequestSender> {
+    pub struct Server<Stream> {
         pub count: std::sync::atomic::AtomicU64,
         pub topic: Topic,
     }
 
-    impl<RequestSender> Server<RequestSender> {
+    impl<Stream> Server<Stream> {
         #[remote_method]
         pub async fn subscribe(&self, client: ClientStub) {
             self.topic.subscribe(std::sync::Arc::clone(client)).await;
@@ -36,11 +36,11 @@ mod counter {
         }
     }
 
-    pub struct Client<RequestSender> {
+    pub struct Client<Stream> {
         pub count: std::sync::atomic::AtomicU64,
     }
 
-    impl<RequestSender> Client<RequestSender> {
+    impl<Stream> Client<Stream> {
         #[remote_method]
         fn update_count(&self, new_count: u64) {
             self.count
@@ -48,6 +48,8 @@ mod counter {
         }
     }
 }
+
+const MAX_FRAME_SIZE: usize = 1024;
 
 #[tokio::test]
 async fn counter_test() {
@@ -60,8 +62,9 @@ async fn counter_test() {
     };
     use tokio::time::{sleep, timeout};
 
-    let server_handle = rpc_genie::Tcp::<1024>::start_server(
+    let server_handle = rpc_genie::tcp::start_server(
         "127.0.0.1:51235",
+        MAX_FRAME_SIZE,
         Arc::new(counter::Server {
             count: AtomicU64::new(0),
             topic: rpc_genie::Topic::new().await,
@@ -72,11 +75,12 @@ async fn counter_test() {
 
     let client_handle = timeout(Duration::from_secs(1), async {
         loop {
-            if let Ok(client_handle) = rpc_genie::Tcp::<1024>::connect_client(
+            if let Ok(client_handle) = rpc_genie::tcp::connect_client(
                 "127.0.0.1:51235",
+                MAX_FRAME_SIZE,
                 Arc::new(counter::Client {
                     count: AtomicU64::new(0),
-                    _request_sender: std::marker::PhantomData,
+                    _stream: std::marker::PhantomData,
                 }),
             )
             .await

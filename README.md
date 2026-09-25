@@ -21,12 +21,12 @@ mod services {
             pub message_publisher: super::message_publisher,
         }
 
-        pub struct Server<RequestSender> {
+        pub struct Server<Stream> {
             // Server will have one field per sub_services added automatically
             pub server_name: String,
         }
 
-        impl<RequestSender> Server<RequestSender> {
+        impl<Stream> Server<Stream> {
             // The #[remote_method] attribute marks this method as being callable from the
             // client
             #[remote_method]
@@ -45,11 +45,11 @@ mod services {
             }
         }
 
-        pub struct Client<RequestSender> {
+        pub struct Client<Stream> {
             // Client will have one field per sub_services added automatically
         }
 
-        impl<RequestSender> Client<RequestSender> {
+        impl<Stream> Client<Stream> {
             // Clients can also have methods with #[remote_method], making the method callable
             // from the server
             #[remote_method]
@@ -71,12 +71,12 @@ mod services {
     pub mod message_publisher {
         use std::sync::Arc;
 
-        pub struct Server<RequestSender> {
+        pub struct Server<Stream> {
             // topic makes it trivial to write pub/subs
             pub topic: Topic,
         }
 
-        impl<RequestSender> Server<RequestSender> {
+        impl<Stream> Server<Stream> {
             #[remote_method]
             pub async fn subscribe(&self, client_stub: ClientStub) {
                 self.topic.subscribe(Arc::clone(client_stub)).await
@@ -96,9 +96,9 @@ mod services {
             }
         }
 
-        pub struct Client<RequestSender> {}
+        pub struct Client<Stream> {}
 
-        impl<RequestSender> Client<RequestSender> {
+        impl<Stream> Client<Stream> {
             #[remote_method]
             pub fn print(msg: String) {
                 println!("{msg}")
@@ -188,7 +188,7 @@ async fn client(server_doesnt_need_client_anymore_receiver: oneshot::Receiver<()
                     message_publisher: Arc::new(services::message_publisher::Client {
                         // When a service has neither a sub-service nor a topic, we need to add
                         // a phantom data of the request sender
-                        _request_sender: PhantomData,
+                        _stream: PhantomData,
                     }),
                 })
             ).await;

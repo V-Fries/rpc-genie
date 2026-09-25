@@ -11,13 +11,13 @@ impl Service {
             &self.server,
             quote!(rpc_genie::Server),
             quote!(ClientStubArcHandle),
-            quote!(ClientStub),
+            quote!(ClientStubWeakHandle),
         );
         let client_state = self.create_final_struct(
             &self.client,
             quote!(rpc_genie::Client),
             quote!(ServerStubArcHandle),
-            quote!(ServerStub),
+            quote!(ServerStubWeakHandle),
         );
 
         quote! {
@@ -31,25 +31,24 @@ impl Service {
         item_struct: &ItemStruct,
         trait_to_implement: TokenStream,
         opposite_stub_arc_handle_type_name: TokenStream,
-        opposite_stub_generic_handle_type_name: TokenStream,
+        opposite_stub_weak_handle_type_name: TokenStream,
     ) -> TokenStream {
         let struct_definition =
-            self.struct_definition(item_struct, opposite_stub_generic_handle_type_name);
+            self.struct_definition(item_struct, opposite_stub_weak_handle_type_name);
 
         let struct_ident = &item_struct.ident;
 
         quote! {
             #struct_definition
 
-            impl<RequestSender> rpc_genie::State for #struct_ident<RequestSender>
+            impl<Stream> rpc_genie::State for #struct_ident<Stream>
             where
-                RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+                Stream: Send + 'static,
             {}
-            impl<Stream, RequestSender>
-                #trait_to_implement<Stream, RequestSender>
-                for #struct_ident<RequestSender>
+
+            impl<Stream> #trait_to_implement<Stream> for #struct_ident<Stream>
             where
-                RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+                Stream: Send + 'static,
             {
                 type #opposite_stub_arc_handle_type_name =
                     #opposite_stub_arc_handle_type_name<Stream>;
@@ -68,16 +67,16 @@ impl Service {
             fields,
             semi_token,
         }: &ItemStruct,
-        opposite_stub_generic_handle_type_name: TokenStream,
+        opposite_stub_weak_handle_type_name: TokenStream,
     ) -> TokenStream {
         let fields =
-            self.generate_struct_fields(ident, fields, opposite_stub_generic_handle_type_name);
+            self.generate_struct_fields(ident, fields, opposite_stub_weak_handle_type_name);
 
         quote! {
             #(#attrs)*
-            #vis #struct_token #ident<RequestSender>
+            #vis #struct_token #ident<Stream>
             where
-                RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+                Stream: Send,
             {
                 #fields
             }#semi_token
@@ -88,7 +87,7 @@ impl Service {
         &self,
         struct_ident: &Ident,
         fields: &Fields,
-        opposite_stub_generic_handle_type_name: TokenStream,
+        opposite_stub_weak_handle_type_name: TokenStream,
     ) -> TokenStream {
         let sub_services_fields = self.sub_services.iter().map(
             |SubService {
@@ -104,7 +103,7 @@ impl Service {
                     // won't be able to see that the value is used unless it is used directly in
                     // the parent)
                     // #[allow(unused)]
-                    #pub_keyword #name #colon std::sync::Arc<#path::#struct_ident<RequestSender>>
+                    #pub_keyword #name #colon std::sync::Arc<#path::#struct_ident<Stream>>
                 }
             },
         );
@@ -116,7 +115,7 @@ impl Service {
                 contains_topic_field = true;
                 field.ty = parse_quote! {
                     rpc_genie::Topic<
-                        #opposite_stub_generic_handle_type_name<RequestSender>
+                        #opposite_stub_weak_handle_type_name<Stream>
                     >
                 };
                 field
@@ -132,8 +131,8 @@ impl Service {
         if self.sub_services.is_empty() && !contains_topic_field {
             fields = quote! {
                 #fields
-                pub _request_sender:
-                    std::marker::PhantomData<fn() -> RequestSender>,
+                pub _stream:
+                    std::marker::PhantomData<fn() -> Stream>,
             };
         }
 

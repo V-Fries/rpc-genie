@@ -32,14 +32,14 @@ impl Service {
         sub_service_struct_creation_ast: &TokenStream,
     ) -> TokenStream {
         quote! {
-            impl<RequestSender> rpc_genie::SubServicesFromState<
-                #state_struct_name<RequestSender>,
-            > for #associated_sub_services_struct_name<RequestSender>
+            impl<Stream> rpc_genie::SubServicesFromState<
+                #state_struct_name<Stream>,
+            > for #associated_sub_services_struct_name<Stream>
             where
-                RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+                Stream: Send,
             {
                 fn from_state(
-                    state: std::sync::Arc<#state_struct_name<RequestSender>>,
+                    state: std::sync::Arc<#state_struct_name<Stream>>,
                     service_path: Option<&str>
                 ) -> Self {
                     #sub_service_struct_creation_ast
@@ -62,7 +62,7 @@ impl Service {
 
     fn sub_service_struct_field_creation_ast(&self) -> TokenStream {
         if self.sub_services.is_empty() {
-            return quote!(_request_sender: std::marker::PhantomData,);
+            return quote!(_stream: std::marker::PhantomData,);
         }
 
         let field_creation_ast = self.sub_services.iter().map(

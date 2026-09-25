@@ -19,8 +19,8 @@ use crate::{
 ///
 /// #[rpc_genie::service]
 /// mod service {
-///     pub struct Server<RequestSender> {}
-///     pub struct Client<RequestSender> {}
+///     pub struct Server<Stream> {}
+///     pub struct Client<Stream> {}
 /// }
 ///
 /// const MAX_FRAME_SIZE: usize = 1024 * 1024;
@@ -31,7 +31,7 @@ use crate::{
 ///         "127.0.0.1:12345",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Server {
-///             _request_sender: PhantomData
+///             _stream: PhantomData
 ///         })
 ///     ).await;
 /// }
@@ -48,11 +48,8 @@ pub async fn start_server<
     server_state: Arc<Server>,
 ) -> Result<server::ServerHandle<Server, ClientStubArcHandle, TcpListener>, server::Error>
 where
-    Server: crate::Server<
-            TcpStream,
-            Weak<stream_handler::Handle<TcpStream>>,
-            ClientStubArcHandle = ClientStubArcHandle,
-        > + IntoRequestHandler<RequestHandler, SubServices>,
+    Server: crate::Server<TcpStream, ClientStubArcHandle = ClientStubArcHandle>
+        + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ClientStubWeakHandle>,
     ClientStubArcHandle: crate::Stub<Arc<stream_handler::Handle<TcpStream>>> + SubscribableStub,
     ClientStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<TcpStream>>> + SubscribableStub,
@@ -78,8 +75,8 @@ where
 ///
 /// #[rpc_genie::service]
 /// mod service {
-///     pub struct Server<RequestSender> {}
-///     pub struct Client<RequestSender> {}
+///     pub struct Server<Stream> {}
+///     pub struct Client<Stream> {}
 /// }
 ///
 /// const MAX_FRAME_SIZE: usize = 1024 * 1024;
@@ -90,7 +87,7 @@ where
 ///         "127.0.0.1:12345",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Client {
-///             _request_sender: PhantomData
+///             _stream: PhantomData
 ///         })
 ///     ).await;
 /// }
@@ -109,11 +106,8 @@ pub async fn connect_client<
 ) -> Result<ClientHandle<ServerStubArcHandle, Client>, client::Error>
 where
     Addr: ToSocketAddrs + Into<String>,
-    Client: crate::Client<
-            TcpStream,
-            Weak<stream_handler::Handle<TcpStream>>,
-            ServerStubArcHandle = ServerStubArcHandle,
-        > + IntoRequestHandler<RequestHandler, SubServices>,
+    Client: crate::Client<TcpStream, ServerStubArcHandle = ServerStubArcHandle>
+        + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ServerStubWeakHandle>,
     ServerStubArcHandle: crate::Stub<Arc<stream_handler::Handle<TcpStream>>>,
     ServerStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<TcpStream>>> + SubscribableStub,

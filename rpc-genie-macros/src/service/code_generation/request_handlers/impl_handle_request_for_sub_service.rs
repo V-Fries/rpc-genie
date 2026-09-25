@@ -5,23 +5,23 @@ use crate::service::{SubService, code_generation::utils::ident_to_lit_str};
 
 pub fn impl_handle_request_for_sub_service(
     associated_sub_service_struct_name: &TokenStream,
-    generic_opposite_stub_struct_name: &TokenStream,
+    opposite_stub_weak_handle_struct_name: &TokenStream,
     sub_services: &[SubService],
 ) -> TokenStream {
     let fn_content = fn_content(sub_services);
 
     quote! {
-        impl<RequestSender>
-            rpc_genie::HandleRequest<#generic_opposite_stub_struct_name<RequestSender>>
-            for #associated_sub_service_struct_name<RequestSender>
+        impl<Stream>
+            rpc_genie::HandleRequest<#opposite_stub_weak_handle_struct_name<Stream>>
+            for #associated_sub_service_struct_name<Stream>
         where
-            RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+            Stream: Send + 'static + tokio::io::AsyncWrite,
         {
             async fn handle_request(
                 &self,
                 method_path: &str,
                 __rpc_opposite_stub_weak_handle__:
-                    &std::sync::Arc<#generic_opposite_stub_struct_name<RequestSender>>,
+                    &std::sync::Arc<#opposite_stub_weak_handle_struct_name<Stream>>,
                 __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
             ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
                 rpc_genie::frame::rpc_response::builder::Uninit,

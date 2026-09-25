@@ -10,7 +10,7 @@ pub fn impl_handle_request_for_request_handler(
     request_handler_struct_name: &TokenStream,
     associated_state_struct_name: &TokenStream,
     associated_remote_methods: &[RemoteMethod],
-    generic_opposite_stub_struct_name: &TokenStream,
+    opposite_stub_weak_handle_struct_name: &TokenStream,
     opposite_stub_alias: &str,
 ) -> TokenStream {
     let fn_content = fn_content(
@@ -20,17 +20,17 @@ pub fn impl_handle_request_for_request_handler(
     );
 
     quote! {
-        impl<RequestSender>
-            rpc_genie::HandleRequest<#generic_opposite_stub_struct_name<RequestSender>>
-            for #request_handler_struct_name<RequestSender>
+        impl<Stream>
+            rpc_genie::HandleRequest<#opposite_stub_weak_handle_struct_name<Stream>>
+            for #request_handler_struct_name<Stream>
         where
-            RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+            Stream: Send + 'static + tokio::io::AsyncWrite,
         {
             async fn handle_request(
                 &self,
                 method_path: &str,
                 __rpc_opposite_stub_weak_handle__:
-                    &std::sync::Arc<#generic_opposite_stub_struct_name<RequestSender>>,
+                    &std::sync::Arc<#opposite_stub_weak_handle_struct_name<Stream>>,
                 mut __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
             ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
                 rpc_genie::frame::rpc_response::builder::Uninit,
@@ -126,7 +126,7 @@ fn match_branch(
 
     let mut method_caller = match remote_method.receiver {
         None => quote! {
-            #associated_state_struct_name::<RequestSender>::#remote_method_name(#(#args_names,)*)
+            #associated_state_struct_name::<Stream>::#remote_method_name(#(#args_names,)*)
         },
         Some(_) => quote!(self.state.#remote_method_name(#(#args_names,)*)),
     };

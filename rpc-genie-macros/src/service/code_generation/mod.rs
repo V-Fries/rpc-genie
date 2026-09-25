@@ -64,7 +64,7 @@ impl Service {
     fn sub_services_structs(&self) -> TokenStream {
         let fields_ast_creator = |field_type| {
             if self.sub_services.is_empty() {
-                return quote!(pub _request_sender: std::marker::PhantomData<RequestSender>,);
+                return quote!(pub _stream: std::marker::PhantomData<fn() -> Stream>,);
             }
 
             self.sub_services.iter().fold(
@@ -78,7 +78,7 @@ impl Service {
                  }| {
                     quote! {
                         #acc
-                        #pub_keyword #name #colon std::sync::Arc<#path::#field_type<RequestSender>>,
+                        #pub_keyword #name #colon std::sync::Arc<#path::#field_type<Stream>>,
                     }
                 },
             )
@@ -89,17 +89,17 @@ impl Service {
 
         quote! {
             #[doc(hidden)]
-            pub struct ServerSubServices<RequestSender>
+            pub struct ServerSubServices<Stream>
             where
-                RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+                Stream: Send,
             {
                 #server_side_fields
             }
 
             #[doc(hidden)]
-            pub struct ClientSubServices<RequestSender>
+            pub struct ClientSubServices<Stream>
             where
-                RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+                Stream: Send,
             {
                 #client_side_fields
             }
@@ -114,20 +114,20 @@ fn into_request_handler_impl_blocks() -> TokenStream {
         associated_sub_services_struct_name: TokenStream,
     ) -> TokenStream {
         quote! {
-            impl<RequestSender> rpc_genie::IntoRequestHandler<
-                #request_handler_struct_name<RequestSender>,
-                #associated_sub_services_struct_name<RequestSender>,
-            > for #state_struct_name<RequestSender>
-                where
-                    RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+            impl<Stream> rpc_genie::IntoRequestHandler<
+                #request_handler_struct_name<Stream>,
+                #associated_sub_services_struct_name<Stream>,
+            > for #state_struct_name<Stream>
+            where
+                Stream: Send,
             {
                 fn into_request_handler(
                     self: std::sync::Arc<Self>,
                     service_path: Option<String>
-                ) -> std::sync::Arc<#request_handler_struct_name<RequestSender>> {
+                ) -> std::sync::Arc<#request_handler_struct_name<Stream>> {
                     use rpc_genie::SubServicesFromState;
 
-                    std::sync::Arc::new(#request_handler_struct_name::<RequestSender> {
+                    std::sync::Arc::new(#request_handler_struct_name::<Stream> {
                         state: std::sync::Arc::clone(&self),
                         sub_services: #associated_sub_services_struct_name::from_state(
                             self,
@@ -163,7 +163,7 @@ fn client_handle_alias() -> TokenStream {
         pub type ClientHandle<Stream>
             = rpc_genie::client::ClientHandle<
                 ServerStubArcHandle<Stream>,
-                Client<std::sync::Weak<rpc_genie::stream_handler::Handle<Stream>>>,
+                Client<Stream>,
             >;
     }
 }
@@ -174,11 +174,7 @@ fn server_handle_alias() -> TokenStream {
         pub type ServerHandle<Listener>
             = rpc_genie::server::ServerHandle<
                 Server<
-                    std::sync::Weak<
-                        rpc_genie::stream_handler::Handle<
-                            <Listener as rpc_genie::server::Listener>::Stream,
-                        >
-                    >
+                    <Listener as rpc_genie::server::Listener>::Stream
                 >,
                 ClientStubArcHandle<
                     <Listener as rpc_genie::server::Listener>::Stream

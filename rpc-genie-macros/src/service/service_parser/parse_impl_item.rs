@@ -29,7 +29,7 @@ pub fn parse_impl_item(
                 &mut item_impl,
                 errors,
                 "ClientStub",
-                quote!(ClientStub),
+                quote!(ClientStubWeakHandle),
             );
             add_where_clause("Server", &mut item_impl.generics.where_clause, errors);
         }
@@ -39,7 +39,7 @@ pub fn parse_impl_item(
                 &mut item_impl,
                 errors,
                 "ServerStub",
-                quote!(ServerStub),
+                quote!(ServerStubWeakHandle),
             );
             add_where_clause("Client", &mut item_impl.generics.where_clause, errors);
         }
@@ -78,7 +78,7 @@ fn push_remote_methods(
     item_impl: &mut ItemImpl,
     errors: &mut Option<syn::Error>,
     opposite_stub_alias: &str,
-    opposite_stub_generic_handle: TokenStream,
+    opposite_stub_weak_handle: TokenStream,
 ) {
     let mut contains_remote_methods = false;
 
@@ -91,7 +91,7 @@ fn push_remote_methods(
             match parse_remote_method(
                 impl_item_fn,
                 opposite_stub_alias,
-                &opposite_stub_generic_handle,
+                &opposite_stub_weak_handle,
             ) {
                 Err(err) => combine_errors(errors, err),
                 Ok(remote_method) => dst.push(remote_method),
@@ -170,7 +170,7 @@ fn check_remote_method_attr_args(attr: &Attribute, errors: &mut Option<syn::Erro
 fn parse_remote_method(
     function: &mut ImplItemFn,
     opposite_stub_alias: &str,
-    opposite_stub_generic_handle: &TokenStream,
+    opposite_stub_weak_handle: &TokenStream,
 ) -> syn::Result<RemoteMethod> {
     let mut errors = None;
 
@@ -179,7 +179,7 @@ fn parse_remote_method(
     replace_opposite_stub_alias_with_actual_type(
         &mut function.sig.inputs,
         opposite_stub_alias,
-        opposite_stub_generic_handle,
+        opposite_stub_weak_handle,
     );
 
     check_remote_method_signature(&function.sig, &mut errors);
@@ -227,7 +227,7 @@ fn remote_method_from(function: &ImplItemFn, errors: &mut Option<syn::Error>) ->
 fn replace_opposite_stub_alias_with_actual_type(
     inputs: &mut Punctuated<FnArg, Comma>,
     opposite_stub_alias: &str,
-    opposite_stub_generic_handle: &TokenStream,
+    opposite_stub_weak_handle: &TokenStream,
 ) {
     *inputs = inputs
         .iter()
@@ -235,8 +235,7 @@ fn replace_opposite_stub_alias_with_actual_type(
         .map(|mut input| match input {
             FnArg::Typed(ref mut pat_type) => match pat_type.ty.deref() {
                 Type::Path(type_path) if type_path.path.is_ident(opposite_stub_alias) => {
-                    pat_type.ty =
-                        parse_quote!(&std::sync::Arc<#opposite_stub_generic_handle<RequestSender>>);
+                    pat_type.ty = parse_quote!(&std::sync::Arc<#opposite_stub_weak_handle<Stream>>);
                     input
                 }
                 _ => input,
@@ -338,6 +337,6 @@ fn add_where_clause(
 
     *where_clause = Some(parse_quote! {
         where
-            RequestSender: rpc_genie::SubscribableStub + rpc_genie::SendRequest,
+            Stream: Send + tokio::io::AsyncWrite + 'static,
     });
 }

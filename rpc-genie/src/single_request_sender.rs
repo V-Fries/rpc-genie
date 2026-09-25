@@ -18,14 +18,14 @@ use crate::{
 ///
 /// #[rpc_genie::service]
 /// mod service {
-///     pub struct Server<RequestSender> {}
+///     pub struct Server<Stream> {}
 ///
-///     impl<RequestSender> Server<RequestSender> {
+///     impl<Stream> Server<Stream> {
 ///         #[remote_method]
 ///         pub fn foo() {}
 ///     }
 ///
-///     pub struct Client<RequestSender> {}
+///     pub struct Client<Stream> {}
 /// }
 ///
 /// const MAX_FRAME_SIZE: usize = 1024 * 1024;
@@ -36,7 +36,7 @@ use crate::{
 ///         "127.0.0.1:12345",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Client {
-///             _request_sender: PhantomData
+///             _stream: PhantomData
 ///         })
 ///     ).await else {
 ///         return;

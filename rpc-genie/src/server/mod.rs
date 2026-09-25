@@ -39,8 +39,8 @@ pub enum Error {
 ///
 /// #[rpc_genie::service]
 /// mod service {
-///     pub struct Server<RequestSender> {}
-///     pub struct Client<RequestSender> {}
+///     pub struct Server<Stream> {}
+///     pub struct Client<Stream> {}
 /// }
 ///
 /// const MAX_FRAME_SIZE: usize = 1024;
@@ -53,7 +53,7 @@ pub enum Error {
 ///             "127.0.0.1:12323",
 ///             MAX_FRAME_SIZE,
 ///             Arc::new(service::Server {
-///                 _request_sender: PhantomData,
+///                 _stream: PhantomData,
 ///             }
 ///         ))
 ///         .await
@@ -159,11 +159,8 @@ pub async fn start_server<
 where
     Listener: listener::Listener<Stream = Stream>,
     Stream: AsyncWrite + AsyncRead + Send + 'static,
-    Server: crate::Server<
-            Stream,
-            Weak<stream_handler::Handle<Stream>>,
-            ClientStubArcHandle = ClientStubArcHandle,
-        > + IntoRequestHandler<RequestHandler, SubServices>,
+    Server: crate::Server<Stream, ClientStubArcHandle = ClientStubArcHandle>
+        + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ClientStubWeakHandle>,
     ClientStubArcHandle: crate::Stub<Arc<stream_handler::Handle<Stream>>> + SubscribableStub,
     ClientStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<Stream>>> + SubscribableStub,
@@ -217,11 +214,8 @@ async fn server_routine<
     topic: Weak<Topic<ClientStubArcHandle>>,
 ) where
     Listener: listener::Listener<Stream = Stream>,
-    Server: crate::Server<
-            Stream,
-            Weak<stream_handler::Handle<Stream>>,
-            ClientStubArcHandle = ClientStubArcHandle,
-        > + IntoRequestHandler<RequestHandler, SubServices>,
+    Server: crate::Server<Stream, ClientStubArcHandle = ClientStubArcHandle>
+        + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ClientStubWeakHandle>,
     ClientStubArcHandle: crate::Stub<Arc<stream_handler::Handle<Stream>>> + SubscribableStub,
     ClientStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<Stream>>> + SubscribableStub,

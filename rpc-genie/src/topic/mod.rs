@@ -28,11 +28,11 @@ mod test;
 /// mod message_publisher {
 ///     use std::sync::Arc;
 ///
-///     pub struct Server<RequestSender> {
+///     pub struct Server<Stream> {
 ///         topic: Topic,
 ///     }
 ///
-///     impl<RequestSender> Server<RequestSender> {
+///     impl<Stream> Server<Stream> {
 ///         #[remote_method]
 ///         pub async fn subscribe(&self, client_stub: ClientStub) {
 ///             self.topic.subscribe(Arc::clone(client_stub)).await
@@ -51,9 +51,9 @@ mod test;
 ///         }
 ///     }
 ///
-///     pub struct Client<RequestSender> {}
+///     pub struct Client<Stream> {}
 ///
-///     impl<RequestSender> Client<RequestSender> {
+///     impl<Stream> Client<Stream> {
 ///         // Clients can also have methods with #[remote_method], making the method callable
 ///         // from the server
 ///         #[remote_method]

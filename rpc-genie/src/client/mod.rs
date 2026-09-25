@@ -25,8 +25,8 @@ use crate::{
 ///
 /// #[rpc_genie::service]
 /// mod service {
-///     pub struct Server<RequestSender> {}
-///     pub struct Client<RequestSender> {}
+///     pub struct Server<Stream> {}
+///     pub struct Client<Stream> {}
 /// }
 ///
 /// const MAX_FRAME_SIZE: usize = 1024;
@@ -42,7 +42,7 @@ use crate::{
 ///             "127.0.0.1:12323",
 ///             MAX_FRAME_SIZE,
 ///             Arc::new(service::Client {
-///                 _request_sender: PhantomData,
+///                 _stream: PhantomData,
 ///             })
 ///         ).await;
 /// }
@@ -95,11 +95,8 @@ pub async fn connect_client<
 where
     Stream: stream::Stream<Addr> + AsyncWrite + AsyncRead + Send + 'static,
     Addr: Into<String>,
-    Client: crate::Client<
-            Stream,
-            Weak<stream_handler::Handle<Stream>>,
-            ServerStubArcHandle = ServerStubArcHandle,
-        > + IntoRequestHandler<RequestHandler, SubServices>,
+    Client: crate::Client<Stream, ServerStubArcHandle = ServerStubArcHandle>
+        + IntoRequestHandler<RequestHandler, SubServices>,
     RequestHandler: HandleRequest<ServerStubWeakHandle>,
     ServerStubArcHandle: crate::Stub<Arc<stream_handler::Handle<Stream>>>,
     ServerStubWeakHandle: crate::Stub<Weak<stream_handler::Handle<Stream>>>,

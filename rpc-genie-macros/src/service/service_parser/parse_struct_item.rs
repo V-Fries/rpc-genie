@@ -35,24 +35,24 @@ pub fn parse_struct_item(
 }
 
 fn check_generics(struct_item: &ItemStruct, errors: &mut Option<syn::Error>) {
-    let mut has_request_sender_type = false;
+    let mut has_stream_type = false;
 
     for generic_param in struct_item.generics.params.iter() {
         check_generic_param(
             &struct_item.ident,
             generic_param,
-            &mut has_request_sender_type,
+            &mut has_stream_type,
             errors,
         );
     }
 
-    if !has_request_sender_type {
+    if !has_stream_type {
         combine_errors(
             errors,
             syn::Error::new_spanned(
                 &struct_item.ident,
                 format!(
-                    "{} struct requires a generic param named RequestSender.",
+                    "{} struct requires a generic param named Stream.",
                     struct_item.ident,
                 ),
             ),
@@ -76,7 +76,7 @@ fn check_generics(struct_item: &ItemStruct, errors: &mut Option<syn::Error>) {
 fn check_generic_param(
     struct_name: &Ident,
     generic_param: &GenericParam,
-    has_request_sender_type: &mut bool,
+    has_stream_type: &mut bool,
     errors: &mut Option<syn::Error>,
 ) {
     match generic_param {
@@ -90,10 +90,10 @@ fn check_generic_param(
             );
         }
         GenericParam::Type(type_param) => {
-            if type_param.ident == "RequestSender" {
+            if type_param.ident == "Stream" {
                 // No need to make an error if the bool is already at true. The compiler will make
                 // one on it's own
-                *has_request_sender_type = true;
+                *has_stream_type = true;
             } else {
                 combine_errors(
                     errors,
@@ -101,7 +101,7 @@ fn check_generic_param(
                         type_param,
                         format!(
                             "{struct_name} struct is not allowed to have generic type parameters \
-                             other than RequestSender."
+                             other than Stream."
                         ),
                     ),
                 );

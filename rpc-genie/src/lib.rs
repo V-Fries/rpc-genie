@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 /// Generate RPC handlers, client stubs, and state wiring for a service module.
 ///
-/// The annotated module must declare `Server<RequestSender>` and `Client<RequestSender>` structs.
+/// The annotated module must declare `Server<Stream>` and `Client<Stream>` structs.
 /// Methods marked with `#[remote_method]` are exposed to the opposite side of the connection.
 /// Use `sub_services!` inside the module to compose services.
 ///
@@ -44,12 +44,12 @@ use std::sync::Arc;
 ///             printer: super::printer,
 ///         }
 ///
-///         struct Server<RequestSender> {
+///         struct Server<Stream> {
 ///             // Server will have one field per sub_services added automatically
 ///             server_name: String,
 ///         }
 ///
-///         impl<RequestSender> Server<RequestSender> {
+///         impl<Stream> Server<Stream> {
 ///             // The #[remote_method] attribute marks this method as being callable from the
 ///             // client
 ///             #[remote_method]
@@ -68,11 +68,11 @@ use std::sync::Arc;
 ///             }
 ///         }
 ///
-///         struct Client<RequestSender> {
+///         struct Client<Stream> {
 ///             // Client will have one field per sub_services added automatically
 ///         }
 ///
-///         impl<RequestSender> Client<RequestSender> {
+///         impl<Stream> Client<Stream> {
 ///             // Clients can also have methods with #[remote_method], making the method callable
 ///             // from the server
 ///             #[remote_method]
@@ -92,18 +92,18 @@ use std::sync::Arc;
 ///
 ///     #[rpc_genie::service]
 ///     mod printer {
-///         pub struct Server<RequestSender> {}
+///         pub struct Server<Stream> {}
 ///
-///         impl<RequestSender> Server<RequestSender> {
+///         impl<Stream> Server<Stream> {
 ///             #[remote_method]
 ///             pub fn print(msg: String) {
 ///                 println!("{msg}")
 ///             }
 ///         }
 ///
-///         pub struct Client<RequestSender> {}
+///         pub struct Client<Stream> {}
 ///
-///         impl<RequestSender> Client<RequestSender> {
+///         impl<Stream> Client<Stream> {
 ///             #[remote_method]
 ///             pub fn print(msg: String) {
 ///                 println!("{msg}")
@@ -180,7 +180,7 @@ pub trait State: Send + Sync + 'static {}
 ///
 /// It is used to identify a struct as a Client to check at compile time that you don't pass a
 /// client state to a function that expects a server state.
-pub trait Client<Stream, ServerStubWeakHandle>: State {
+pub trait Client<Stream>: State {
     /// The generated, owning stub used to make requests to the server.
     type ServerStubArcHandle;
 }
@@ -189,7 +189,7 @@ pub trait Client<Stream, ServerStubWeakHandle>: State {
 ///
 /// It is used to identify a struct as a Server to check at compile time that you don't pass a
 /// server state to a function that expects a client state.
-pub trait Server<Stream, ClientStubWeakHandle>: State {
+pub trait Server<Stream>: State {
     /// The generated, owning stub used to make requests to a connected client.
     type ClientStubArcHandle;
 }
