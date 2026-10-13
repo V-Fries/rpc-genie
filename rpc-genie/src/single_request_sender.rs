@@ -71,6 +71,11 @@ where
     }
 
     /// Send the request and wait for the response.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If the method is used as the
+    /// event in a [`tokio::select!`] statement and some other branch completes first a frame could
+    /// be partially written to the stream which will corrupt the stream.
     pub async fn call(self) -> Result<ResponseType, CallError> {
         self.request_sender
             .call(self.request_builder)
@@ -80,6 +85,11 @@ where
     }
 
     /// Send the request without waiting for a response.
+    ///
+    /// # Cancel safety
+    /// This method is not cancellation safe. If the method is used as the
+    /// event in a [`tokio::select!`] statement and some other branch completes first a frame could
+    /// be partially written to the stream which will corrupt the stream.
     pub async fn notify(self) -> Result<(), NotifyError> {
         self.request_sender.notify(self.request_builder).await
     }
