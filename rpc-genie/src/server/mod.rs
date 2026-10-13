@@ -138,8 +138,8 @@ where
 /// Start a server using a listener implementation and return its lifecycle handle.
 ///
 /// You probably never want to call this directly, use
-/// [`Tcp::start_server`](crate::Tcp::start_server) /
-/// [`UnixSocket::start_server`](crate::UnixSocket::start_server) instead.
+/// [`tcp::start_server`](crate::tcp::start_server) /
+/// [`unix_socket::start_server`](crate::unix_socket::start_server) instead.
 ///
 /// This function is only useful to call manually if you plan on implementing the [`Listener`] and
 /// [`Stream`](crate::client::Stream) traits for a custom transport.

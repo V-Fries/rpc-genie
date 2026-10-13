@@ -151,8 +151,8 @@ fn has_remote_method_attr(impl_item_fn: &ImplItemFn, errors: &mut Option<syn::Er
     true
 }
 
-/// #[remote_method] attributes should not have any arguments so this returns an error if there are
-/// any
+/// `#[remote_method]` attributes should not have any arguments so this returns an error if there
+/// are any
 fn check_remote_method_attr_args(attr: &Attribute, errors: &mut Option<syn::Error>) {
     match attr.meta {
         syn::Meta::Path(_) => (),

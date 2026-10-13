@@ -74,8 +74,8 @@ impl<Stub, Client> ClientHandle<Stub, Client> {
 /// Connect using a stream implementation and start the client request routine.
 ///
 /// You probably never want to call this directly, use
-/// [`Tcp::connect_client`](crate::Tcp::connect_client) /
-/// [`UnixSocket::connect_client`](crate::UnixSocket::connect_client) instead.
+/// [`tcp::connect_client`](crate::tcp::connect_client) /
+/// [`unix_socket::connect_client`](crate::unix_socket::connect_client) instead.
 ///
 /// This function is only useful to call manually if you plan on implementing the
 /// [`Listener`](crate::server::Listener) and [`Stream`] traits for a custom transport.

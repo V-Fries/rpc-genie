@@ -7,7 +7,7 @@ This crate is currently is final stages of testing before publishing version 0.1
 ## Usage:
 
 - Define a service with the [`service`] macro
-- Use [`Tcp`]/[`UnixSocket`] to start the server and connect the clients
+- Use [`tcp`]/[`unix_socket`] to start the server and connect the clients
 
 ## Example:
 
