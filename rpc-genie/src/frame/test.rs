@@ -289,7 +289,7 @@ mod max_size_check {
             .unwrap_err()
         {
             WriteError::FrameTooBig { size: _, max_size } => assert_eq!(max_size, 1),
-            other => println!("Unexpected error: {other:?}"),
+            other => panic!("Unexpected error: {other:?}"),
         }
     }
 
@@ -309,7 +309,7 @@ mod max_size_check {
 
         match Frame::read_frame(&mut stream_2, 3).await.unwrap_err() {
             ReadError::FrameTooBig { size: _, max_size } => assert_eq!(max_size, 3),
-            other => println!("Unexpected error: {other:?}"),
+            other => panic!("Unexpected error: {other:?}"),
         }
     }
 
@@ -327,7 +327,7 @@ mod max_size_check {
             .unwrap_err()
         {
             WriteError::FrameTooBig { size: _, max_size } => assert_eq!(max_size, 1),
-            other => println!("Unexpected error: {other:?}"),
+            other => panic!("Unexpected error: {other:?}"),
         }
     }
 
@@ -346,7 +346,7 @@ mod max_size_check {
 
         match Frame::read_frame(&mut stream_2, 3).await.unwrap_err() {
             ReadError::FrameTooBig { size: _, max_size } => assert_eq!(max_size, 3),
-            other => println!("Unexpected error: {other:?}"),
+            other => panic!("Unexpected error: {other:?}"),
         }
     }
 }
