@@ -47,6 +47,7 @@ use crate::{
 ///         ).await;
 /// }
 /// ```
+#[must_use = "The client stops when it is dropped"]
 pub struct ClientHandle<Stub, Client> {
     /// Stub used to invoke methods on the server.
     pub server_stub: Stub,

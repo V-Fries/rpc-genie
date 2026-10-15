@@ -60,6 +60,7 @@ pub enum Error {
 ///         .unwrap();
 /// }
 /// ```
+#[must_use = "The server stops when it is dropped"]
 pub struct ServerHandle<ServerState, Stub, Listener>
 where
     Stub: SubscribableStub,
