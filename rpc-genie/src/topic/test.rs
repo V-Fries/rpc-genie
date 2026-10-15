@@ -44,7 +44,9 @@ impl TestStub {
         drop(state);
 
         for sender in senders {
-            let _ = sender.send(());
+            if let Some(sender) = sender.upgrade() {
+                let _ = sender.send(self.stream_id);
+            }
         }
     }
 }

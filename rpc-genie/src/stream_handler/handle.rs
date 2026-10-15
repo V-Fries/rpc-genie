@@ -19,7 +19,7 @@ use crate::{
     },
     send_request::SendRequest,
     stream_handler::{KillRoutineSender, ResponseSender, ShouldSendDisconnectFrame, StreamId},
-    topic::{self, StubDiedNotificationSender, TopicId},
+    topic::{self, TopicId},
 };
 
 pub struct Handle<Stream> {
@@ -89,9 +89,13 @@ impl RegisteredTopics {
         }
     }
 
-    fn send_death_notifications(self) {
-        for topic in self.topics.into_iter() {
-            let _ = topic.stub_died_notification_sender.send(());
+    fn send_death_notifications(self, stream_id: StreamId) {
+        for registered_topic in self.topics.into_iter() {
+            if let Some(sender) = registered_topic.stub_died_notification_sender.upgrade() {
+                // Ignoring error as the topic routine might have ended already (i.e. the receiver was
+                // dropped)
+                let _ = sender.send(stream_id);
+            }
         }
     }
 }
@@ -118,7 +122,7 @@ impl<Stream> Handle<Stream> {
             .lock()
             .unwrap_or_else(|poison_error| poison_error.into_inner());
 
-        mem::take(&mut *registered_topics_lock).send_death_notifications();
+        mem::take(&mut *registered_topics_lock).send_death_notifications(self.stream_id);
     }
 }
 
@@ -397,7 +401,7 @@ where
     async fn add_registered_topic(
         &self,
         topic_id: TopicId,
-        stub_died_notification_sender: StubDiedNotificationSender,
+        stub_died_notification_sender: topic::StubDiedNotificationSender,
     ) -> bool {
         let mut lock = self.state.lock().await;
 
