@@ -93,10 +93,11 @@ where
             let frame = match Frame::read_frame(&mut buf_reader, max_frame_size).await {
                 Ok(frame) => frame,
                 Err(err) => {
-                    eprintln!(
-                        "Stream {}: Error reading frame, stopping handler loop: {err}",
-                        self.stream_id
-                    );
+                    // TODO use a logging crate
+                    // eprintln!(
+                    //     "Stream {}: Error reading frame, stopping handler loop: {err}",
+                    //     self.stream_id
+                    // );
 
                     if let Some(handle) = self.handle.upgrade() {
                         handle.stop_with(err.into()).await;
@@ -108,7 +109,8 @@ where
                 }
             };
 
-            println!("Stream {}: Received new frame", self.stream_id);
+            // TODO use a logging crate
+            // println!("Stream {}: Received new frame", self.stream_id);
 
             match frame {
                 Frame::Disconnected => {
@@ -173,7 +175,10 @@ where
         match write_result {
             Ok(()) => {}
             Err(err) => {
-                eprintln!("Stream {stream_id}: Error writing frame, stopping handler loop: {err}");
+                // TODO use a logging crate
+                let _ = stream_id;
+                // eprintln!("Stream {stream_id}: Error writing frame, stopping handler loop: {err}");
+
                 let Some(handle) = handle.upgrade() else {
                     return;
                 };
@@ -185,8 +190,10 @@ where
 
     async fn handle_rpc_response(&self, response: RpcResponse) {
         let Some(sender) = self.request_map.lock().await.remove(&response.id()) else {
+            // TODO use a logging crate
             eprintln!(
-                "Stream {}: Received a response with an invalid id({})",
+                "Stream {}: Received a response with an invalid id {}, the request may have \
+                 timed-out",
                 self.stream_id,
                 response.id()
             );
@@ -197,9 +204,10 @@ where
         match sender.send(Ok(response)) {
             Ok(()) => {}
             Err(_) => {
+                // TODO use a logging crate
                 eprintln!(
-                    "Stream {}: Failed to send response through timer, (maybe the request \
-                     timed-out)",
+                    "Stream {}: Failed to send incoming response to caller, the request likely \
+                     timed-out",
                     self.stream_id
                 )
             }

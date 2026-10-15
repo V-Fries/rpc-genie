@@ -30,6 +30,7 @@ impl Listener for UnixListener {
 
     fn on_routine_end(path: &str) {
         if let Err(err) = std::fs::remove_file(path) {
+            // TODO use a logging crate
             eprintln!("Error: Failed to delete unix socket file {path:?}: {err}",)
         }
     }
