@@ -4,12 +4,10 @@ use std::{
     sync::Arc,
 };
 
-use tokio::sync::oneshot;
-
 use crate::{
     SubscribableStub,
     stream_handler::StreamId,
-    topic::{TopicId, routine::StubDiedNotificationReceiver},
+    topic::{TopicId, routine::StubDiedNotificationSender},
 };
 
 pub struct SubscribedStubs<Stub>
@@ -48,40 +46,40 @@ where
         self.stubs.iter().map(|(_stream_id, stub)| stub)
     }
 
-    /// Returns Some(StubDiedNotificationReceiver) if add was successful, None if it failed or if
-    /// the stub was already present
     pub(super) async fn add(
         &mut self,
         stub: Arc<Stub>,
         topic_id: TopicId,
-    ) -> Option<StubDiedNotificationReceiver> {
-        let (sender, receiver) = oneshot::channel();
-
-        let stream_id = stub.stream_id()?;
+        stub_died_notification_sender: StubDiedNotificationSender,
+    ) {
+        let stream_id = match stub.stream_id() {
+            Some(stream_id) => stream_id,
+            None => return,
+        };
 
         match self.positions.entry(stream_id) {
-            hash_map::Entry::Occupied(_) => None,
+            hash_map::Entry::Occupied(_) => {}
             hash_map::Entry::Vacant(entry) => {
-                if !stub.add_registered_topic(topic_id, sender).await {
-                    return None;
+                if !stub
+                    .add_registered_topic(topic_id, stub_died_notification_sender)
+                    .await
+                {
+                    return;
                 }
 
                 entry.insert(self.stubs.len());
                 self.stubs.push((stream_id, stub));
-
-                Some(receiver)
             }
         }
     }
 
-    /// Returns true if it was removed, false otherwise
     pub(super) fn remove<const SHOULD_CALL_REMOVE_REGISTERED_TOPIC: bool>(
         &mut self,
         stream_id: StreamId,
         topic_id: TopicId,
-    ) -> bool {
+    ) {
         let Some(index) = self.positions.remove(&stream_id) else {
-            return false;
+            return;
         };
 
         let last_index = self.stubs.len() - 1;
@@ -99,7 +97,5 @@ where
         if SHOULD_CALL_REMOVE_REGISTERED_TOPIC {
             removed_stub.remove_registered_topic(topic_id);
         }
-
-        true
     }
 }
