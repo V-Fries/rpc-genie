@@ -231,7 +231,8 @@ async fn server_routine<
         let request_handler_clone = Arc::clone(&request_handler);
 
         let client_id = StreamId::next();
-        println!("Client connected: {}", client_id);
+        // TODO use a logging crate
+        // println!("Client connected: {}", client_id);
 
         let Some(topic) = topic.upgrade() else {
             return;
