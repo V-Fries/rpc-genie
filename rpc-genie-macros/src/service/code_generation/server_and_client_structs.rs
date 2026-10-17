@@ -9,13 +9,13 @@ impl Service {
     pub fn server_and_clients_structs(&self) -> TokenStream {
         let server_state = self.create_final_struct(
             &self.server,
-            quote!(rpc_genie::Server),
+            quote!(::rpc_genie::Server),
             quote!(ClientStubArcHandle),
             quote!(ClientStubWeakHandle),
         );
         let client_state = self.create_final_struct(
             &self.client,
-            quote!(rpc_genie::Client),
+            quote!(::rpc_genie::Client),
             quote!(ServerStubArcHandle),
             quote!(ServerStubWeakHandle),
         );
@@ -41,7 +41,7 @@ impl Service {
         quote! {
             #struct_definition
 
-            impl<Stream> rpc_genie::State for #struct_ident<Stream>
+            impl<Stream> ::rpc_genie::State for #struct_ident<Stream>
             where
                 Stream: Send + 'static,
             {}
@@ -114,7 +114,7 @@ impl Service {
             Type::Path(type_path) if type_path.path.is_ident("Topic") => {
                 contains_topic_field = true;
                 field.ty = parse_quote! {
-                    rpc_genie::Topic<
+                    ::rpc_genie::Topic<
                         #opposite_stub_weak_handle_type_name<Stream>
                     >
                 };

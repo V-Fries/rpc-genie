@@ -21,7 +21,7 @@ pub fn impl_handle_request_for_request_handler(
 
     quote! {
         impl<Stream>
-            rpc_genie::HandleRequest<#opposite_stub_weak_handle_struct_name<Stream>>
+            ::rpc_genie::HandleRequest<#opposite_stub_weak_handle_struct_name<Stream>>
             for #request_handler_struct_name<Stream>
         where
             Stream: Send + 'static + tokio::io::AsyncWrite,
@@ -31,10 +31,10 @@ pub fn impl_handle_request_for_request_handler(
                 method_path: &str,
                 __rpc_opposite_stub_weak_handle__:
                     &std::sync::Arc<#opposite_stub_weak_handle_struct_name<Stream>>,
-                mut __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
-            ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
-                rpc_genie::frame::rpc_response::builder::Uninit,
-                rpc_genie::frame::rpc_response::builder::ResponseInit,
+                mut __rpc_request_arg_reader__: ::rpc_genie::frame::rpc_request::RpcRequestArgReader,
+            ) -> ::rpc_genie::frame::rpc_response::RpcResponseBuilder<
+                ::rpc_genie::frame::rpc_response::builder::Uninit,
+                ::rpc_genie::frame::rpc_response::builder::ResponseInit,
             > {
                 #fn_content
             }
@@ -100,8 +100,8 @@ fn match_branch(
                     let #pat = match __rpc_request_arg_reader__.read_arg::<#ty>() {
                         Ok(arg) => arg,
                         Err(err) => {
-                            return rpc_genie::frame::rpc_response::RpcResponse::builder().error(
-                                rpc_genie::frame::rpc_response::RpcResponseError::FailedToDeserializeArg {
+                            return ::rpc_genie::frame::rpc_response::RpcResponse::builder().error(
+                                ::rpc_genie::frame::rpc_response::RpcResponseError::FailedToDeserializeArg {
                                     serialize_error: err.to_string(),
                                 },
                             );
@@ -138,7 +138,7 @@ fn match_branch(
     quote! {
         #method_name_as_literal_str => {
             #(#code_that_parses_args_into_vars)*
-            rpc_genie::frame::rpc_response::RpcResponse::builder().response(&#method_caller)
+            ::rpc_genie::frame::rpc_response::RpcResponse::builder().response(&#method_caller)
         }
     }
 }

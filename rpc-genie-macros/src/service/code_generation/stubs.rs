@@ -58,12 +58,12 @@ impl Service {
 
             pub type #stub_arc_handle_type_name<Stream> =
                 #generic_stub_struct_name<
-                    std::sync::Arc<rpc_genie::stream_handler::Handle<Stream>>
+                    std::sync::Arc<::rpc_genie::stream_handler::Handle<Stream>>
                 >;
 
             pub type #stub_weak_handle_type_name<Stream> =
                 #generic_stub_struct_name<
-                    std::sync::Weak<rpc_genie::stream_handler::Handle<Stream>>
+                    std::sync::Weak<::rpc_genie::stream_handler::Handle<Stream>>
                 >;
 
 
@@ -120,10 +120,10 @@ impl Service {
         );
 
         quote! {
-            impl<RequestSender> rpc_genie::Stub<RequestSender>
+            impl<RequestSender> ::rpc_genie::Stub<RequestSender>
                 for #generic_stub_struct_name<RequestSender>
             where
-                RequestSender: rpc_genie::send_request::SendRequest,
+                RequestSender: ::rpc_genie::send_request::SendRequest,
             {
                 fn new(request_sender: RequestSender, service_path: Option<String>) -> Self {
                     Self {
@@ -149,7 +149,7 @@ fn remote_methods_callers(
     quote! {
         impl<RequestSender> #generic_stub_struct_name<RequestSender>
         where
-            RequestSender: rpc_genie::send_request::SendRequest,
+            RequestSender: ::rpc_genie::send_request::SendRequest,
         {
             #(#associated_remote_methods)*
         }
@@ -168,9 +168,9 @@ fn remote_method_caller(
     opposite_stub_alias: &str,
 ) -> TokenStream {
     let output = match output {
-        ReturnType::Default => quote!(-> rpc_genie::SingleRequestSender<RequestSender, ()>),
+        ReturnType::Default => quote!(-> ::rpc_genie::SingleRequestSender<RequestSender, ()>),
         ReturnType::Type(arrow, type_ast) => {
-            quote!(#arrow rpc_genie::SingleRequestSender<RequestSender, #type_ast>)
+            quote!(#arrow ::rpc_genie::SingleRequestSender<RequestSender, #type_ast>)
         }
     };
 
@@ -192,9 +192,9 @@ fn remote_method_caller(
 
     quote! {
         #vis fn #ident(&self, #(#args,)*) #output {
-            rpc_genie::SingleRequestSender::new(
+            ::rpc_genie::SingleRequestSender::new(
                 self.__rpc_genie_request_sender__.clone(),
-                rpc_genie::frame::rpc_request::RpcRequest::builder()
+                ::rpc_genie::frame::rpc_request::RpcRequest::builder()
                     // No need to add "/" as it already present at the end of the path
                     .method_path(
                         match self.__rpc_service_path__ {
@@ -212,17 +212,17 @@ fn remote_method_caller(
 
 fn impl_subscribable_stub_trait(generic_stub_struct_name: &TokenStream) -> TokenStream {
     quote! {
-        impl<RequestSender> rpc_genie::SubscribableStub
+        impl<RequestSender> ::rpc_genie::SubscribableStub
             for #generic_stub_struct_name<RequestSender>
         where
-            RequestSender: rpc_genie::SubscribableStub + Sync + Send,
+            RequestSender: ::rpc_genie::SubscribableStub + Sync + Send,
         {
             async fn add_registered_topic(
                 &self,
-                topic_id: rpc_genie::topic::TopicId,
-                stub_died_notification_sender: rpc_genie::topic::StubDiedNotificationSender,
+                topic_id: ::rpc_genie::topic::TopicId,
+                stub_died_notification_sender: ::rpc_genie::topic::StubDiedNotificationSender,
             ) -> bool {
-                rpc_genie::SubscribableStub::add_registered_topic(
+                ::rpc_genie::SubscribableStub::add_registered_topic(
                     &self.__rpc_genie_request_sender__,
                     topic_id,
                     stub_died_notification_sender,
@@ -231,16 +231,16 @@ fn impl_subscribable_stub_trait(generic_stub_struct_name: &TokenStream) -> Token
 
             fn remove_registered_topic(
                 &self,
-                topic_id: rpc_genie::topic::TopicId
+                topic_id: ::rpc_genie::topic::TopicId
             ) {
-                rpc_genie::SubscribableStub::remove_registered_topic(
+                ::rpc_genie::SubscribableStub::remove_registered_topic(
                     &self.__rpc_genie_request_sender__,
                     topic_id,
                 )
             }
 
-            fn stream_id(&self) -> Option<rpc_genie::stream_handler::StreamId> {
-                rpc_genie::SubscribableStub::stream_id(&self.__rpc_genie_request_sender__)
+            fn stream_id(&self) -> Option<::rpc_genie::stream_handler::StreamId> {
+                ::rpc_genie::SubscribableStub::stream_id(&self.__rpc_genie_request_sender__)
             }
         }
     }

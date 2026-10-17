@@ -114,7 +114,7 @@ fn into_request_handler_impl_blocks() -> TokenStream {
         associated_sub_services_struct_name: TokenStream,
     ) -> TokenStream {
         quote! {
-            impl<Stream> rpc_genie::IntoRequestHandler<
+            impl<Stream> ::rpc_genie::IntoRequestHandler<
                 #request_handler_struct_name<Stream>,
                 #associated_sub_services_struct_name<Stream>,
             > for #state_struct_name<Stream>
@@ -125,7 +125,7 @@ fn into_request_handler_impl_blocks() -> TokenStream {
                     self: std::sync::Arc<Self>,
                     service_path: Option<String>
                 ) -> std::sync::Arc<#request_handler_struct_name<Stream>> {
-                    use rpc_genie::SubServicesFromState;
+                    use ::rpc_genie::SubServicesFromState;
 
                     std::sync::Arc::new(#request_handler_struct_name::<Stream> {
                         state: std::sync::Arc::clone(&self),
@@ -159,9 +159,9 @@ fn into_request_handler_impl_blocks() -> TokenStream {
 
 fn client_handle_alias() -> TokenStream {
     quote! {
-        /// Type alias of an `rpc_genie::client::ClientHandle` for this service
+        /// Type alias of an `::rpc_genie::client::ClientHandle` for this service
         pub type ClientHandle<Stream>
-            = rpc_genie::client::ClientHandle<
+            = ::rpc_genie::client::ClientHandle<
                 ServerStubArcHandle<Stream>,
                 Client<Stream>,
             >;
@@ -170,14 +170,14 @@ fn client_handle_alias() -> TokenStream {
 
 fn server_handle_alias() -> TokenStream {
     quote! {
-        /// Type alias of an `rpc_genie::server::ServerHandle` for this service
+        /// Type alias of an `::rpc_genie::server::ServerHandle` for this service
         pub type ServerHandle<Listener>
-            = rpc_genie::server::ServerHandle<
+            = ::rpc_genie::server::ServerHandle<
                 Server<
-                    <Listener as rpc_genie::server::Listener>::Stream
+                    <Listener as ::rpc_genie::server::Listener>::Stream
                 >,
                 ClientStubArcHandle<
-                    <Listener as rpc_genie::server::Listener>::Stream
+                    <Listener as ::rpc_genie::server::Listener>::Stream
                 >,
                 Listener,
             >;

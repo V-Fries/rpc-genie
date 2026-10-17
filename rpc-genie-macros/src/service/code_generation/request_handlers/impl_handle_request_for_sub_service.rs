@@ -12,7 +12,7 @@ pub fn impl_handle_request_for_sub_service(
 
     quote! {
         impl<Stream>
-            rpc_genie::HandleRequest<#opposite_stub_weak_handle_struct_name<Stream>>
+            ::rpc_genie::HandleRequest<#opposite_stub_weak_handle_struct_name<Stream>>
             for #associated_sub_service_struct_name<Stream>
         where
             Stream: Send + 'static + tokio::io::AsyncWrite,
@@ -22,10 +22,10 @@ pub fn impl_handle_request_for_sub_service(
                 method_path: &str,
                 __rpc_opposite_stub_weak_handle__:
                     &std::sync::Arc<#opposite_stub_weak_handle_struct_name<Stream>>,
-                __rpc_request_arg_reader__: rpc_genie::frame::rpc_request::RpcRequestArgReader,
-            ) -> rpc_genie::frame::rpc_response::RpcResponseBuilder<
-                rpc_genie::frame::rpc_response::builder::Uninit,
-                rpc_genie::frame::rpc_response::builder::ResponseInit,
+                __rpc_request_arg_reader__: ::rpc_genie::frame::rpc_request::RpcRequestArgReader,
+            ) -> ::rpc_genie::frame::rpc_response::RpcResponseBuilder<
+                ::rpc_genie::frame::rpc_response::builder::Uninit,
+                ::rpc_genie::frame::rpc_response::builder::ResponseInit,
             > {
                 #fn_content
             }
@@ -35,8 +35,8 @@ pub fn impl_handle_request_for_sub_service(
 
 fn fn_content(sub_services: &[SubService]) -> TokenStream {
     let not_found_error_ast = quote! {
-        rpc_genie::frame::rpc_response::RpcResponse::builder()
-            .error(rpc_genie::frame::rpc_response::RpcResponseError::MethodNotFound)
+        ::rpc_genie::frame::rpc_response::RpcResponse::builder()
+            .error(::rpc_genie::frame::rpc_response::RpcResponseError::MethodNotFound)
     };
 
     if sub_services.is_empty() {

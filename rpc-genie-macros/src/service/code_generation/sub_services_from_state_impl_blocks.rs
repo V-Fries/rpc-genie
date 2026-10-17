@@ -32,7 +32,7 @@ impl Service {
         sub_service_struct_creation_ast: &TokenStream,
     ) -> TokenStream {
         quote! {
-            impl<Stream> rpc_genie::SubServicesFromState<
+            impl<Stream> ::rpc_genie::SubServicesFromState<
                 #state_struct_name<Stream>,
             > for #associated_sub_services_struct_name<Stream>
             where
@@ -52,7 +52,7 @@ impl Service {
         let field_creation_ast = self.sub_service_struct_field_creation_ast();
 
         quote! {
-            use rpc_genie::IntoRequestHandler;
+            use ::rpc_genie::IntoRequestHandler;
 
             Self {
                 #field_creation_ast
