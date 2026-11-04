@@ -12,8 +12,10 @@ use crate::{
 
 /// Bind a Unix socket and start serving requests in the background.
 ///
-/// The returned [`server::ServerHandle`] owns the server task. Dropping it
-/// stops the task; use `wait_until_stopped` to keep the server running.
+/// The returned [`server::ServerHandle`] owns the server listener task. Dropping
+/// it requests shutdown; use [`server::ServerHandle::stop`] to request shutdown
+/// and wait for the listener task to exit, or `wait_until_stopped` to wait for
+/// the listener task to stop on its own.
 ///
 /// # Example
 /// ```rust
