@@ -2,9 +2,12 @@ use std::ops::Deref;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{LitStr, ReturnType, Type};
+use syn::{LitStr, Type};
 
-use crate::service::{RemoteMethod, Service, SubService, code_generation::utils::ident_to_lit_str};
+use crate::service::{
+    RemoteMethod, Service, SubService,
+    code_generation::utils::{ident_to_lit_str, single_request_sender_output},
+};
 
 impl Service {
     pub fn stubs(&self) -> TokenStream {
@@ -43,6 +46,7 @@ impl Service {
             associated_remote_methods,
             opposite_stub_alias,
         );
+        let sub_service_getters = self.sub_service_getters(&generic_stub_struct_name);
         let impl_stub_trait = self.impl_stub_trait(&generic_stub_struct_name);
         let impl_subscribable_stub_trait = impl_subscribable_stub_trait(&generic_stub_struct_name);
 
@@ -71,6 +75,33 @@ impl Service {
             #impl_subscribable_stub_trait
 
             #remote_methods_callers
+            #sub_service_getters
+        }
+    }
+
+    fn sub_service_getters(&self, generic_stub_struct_name: &TokenStream) -> TokenStream {
+        let getters = self.sub_services.iter().filter_map(
+            |SubService {
+                 pub_keyword,
+                 name,
+                 path,
+                 ..
+             }| {
+                Some(quote! {
+                    #pub_keyword fn #name(&self) -> &#path::#generic_stub_struct_name<RequestSender> {
+                        self.#name.as_ref()
+                    }
+                })
+            },
+        );
+
+        quote! {
+            impl<RequestSender> #generic_stub_struct_name<RequestSender>
+            where
+                RequestSender: rpc_genie::send_request::SendRequest,
+            {
+                #(#getters)*
+            }
         }
     }
 
@@ -79,14 +110,14 @@ impl Service {
             TokenStream::new(),
             |acc,
              SubService {
-                 pub_keyword,
+                 pub_keyword: _,
                  name,
                  colon,
                  path,
              }| {
                 quote! {
                     #acc
-                    #pub_keyword #name #colon
+                    #name #colon
                         std::sync::Arc<#path::#generic_stub_struct_name<RequestSender>>,
                 }
             },
@@ -167,12 +198,7 @@ fn remote_method_caller(
     }: &RemoteMethod,
     opposite_stub_alias: &str,
 ) -> TokenStream {
-    let output = match output {
-        ReturnType::Default => quote!(-> rpc_genie::SingleRequestSender<RequestSender, ()>),
-        ReturnType::Type(arrow, type_ast) => {
-            quote!(#arrow rpc_genie::SingleRequestSender<RequestSender, #type_ast>)
-        }
-    };
+    let output = single_request_sender_output(output);
 
     let args = args.iter().filter(|arg| match arg.ty.deref() {
         Type::Path(type_path) if type_path.path.is_ident(opposite_stub_alias) => {

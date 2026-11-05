@@ -295,6 +295,106 @@ fn error_if_sub_services_name_is_also_a_client_field_name() {
 }
 
 #[test]
+fn error_if_remote_method_name_matches_public_sub_service_getter() {
+    let service = quote! {
+        mod foo {
+            sub_services! {
+                pub child: super::bar,
+            }
+
+            struct Server<Stream> {}
+
+            impl<Stream> Server<Stream> {
+                #[remote_method]
+                pub fn child() {}
+            }
+
+            struct Client<Stream> {}
+        }
+    };
+
+    expect_error!(
+        service,
+        "remote method name cannot match a sub-service name"
+    );
+}
+
+#[test]
+fn error_if_private_remote_method_name_matches_private_sub_service_getter() {
+    let service = quote! {
+        mod foo {
+            sub_services! {
+                child: super::bar,
+            }
+
+            struct Server<Stream> {}
+
+            impl<Stream> Server<Stream> {
+                #[remote_method]
+                fn child() {}
+            }
+
+            struct Client<Stream> {}
+        }
+    };
+
+    expect_error!(
+        service,
+        "remote method name cannot match a sub-service name"
+    );
+}
+
+#[test]
+fn error_if_public_remote_method_name_matches_private_sub_service_getter() {
+    let service = quote! {
+        mod foo {
+            sub_services! {
+                child: super::bar,
+            }
+
+            struct Server<Stream> {}
+
+            impl<Stream> Server<Stream> {
+                #[remote_method]
+                pub fn child() {}
+            }
+
+            struct Client<Stream> {}
+        }
+    };
+
+    expect_error!(
+        service,
+        "remote method name cannot match a sub-service name"
+    );
+}
+
+#[test]
+fn error_if_private_remote_method_name_matches_public_sub_service_getter() {
+    let service = quote! {
+        mod foo {
+            sub_services! {
+                pub child: super::bar,
+            }
+
+            struct Server<Stream> {}
+
+            impl<Stream> Server<Stream> {
+                #[remote_method]
+                fn child() {}
+            }
+
+            struct Client<Stream> {}
+        }
+    };
+
+    expect_error!(
+        service,
+        "remote method name cannot match a sub-service name"
+    );
+}
+
+#[test]
 fn error_if_sub_services_macro_doesnt_use_braces() {
     let service = quote! {
         mod foo {

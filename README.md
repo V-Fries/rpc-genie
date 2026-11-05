@@ -158,7 +158,7 @@ async fn server(server_doesnt_need_client_anymore_sender: oneshot::Sender<()>) {
     let () = server_handle
         .for_each_client(async |client| {
                 client
-                    .message_publisher
+                    .message_publisher()
                     .print("hey".to_string())
                     .call()
                     .await

@@ -167,7 +167,9 @@ async fn server_tests(
     assert_eq!(
         vec![3],
         server_handle
-            .map_each_client(async |client| client.sub_service_2.add(1, 2).call().await.unwrap())
+            .map_each_client(async |client| {
+                client.sub_service_2().add(1, 2).call().await.unwrap()
+            })
             .await
     );
 

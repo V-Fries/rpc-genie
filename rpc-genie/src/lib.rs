@@ -85,7 +85,7 @@ use std::sync::Arc;
 ///                 // The client can also get a stub to the server as an argument to a remote
 ///                 // method
 ///                 let _server_name = server.get_server_name().call().await.unwrap();
-///                 server.printer.print("bar".to_owned()).notify().await.unwrap();
+///                 server.printer().print("bar".to_owned()).notify().await.unwrap();
 ///             }
 ///         }
 ///     }

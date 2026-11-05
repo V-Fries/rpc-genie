@@ -1,5 +1,6 @@
 mod request_handlers;
 mod server_and_client_structs;
+mod stub_traits;
 mod stubs;
 mod sub_services_from_state_impl_blocks;
 mod utils;
@@ -38,6 +39,7 @@ impl ToTokens for Service {
 impl Service {
     fn content(&self) -> TokenStream {
         let server_and_clients_structs = self.server_and_clients_structs();
+        let stub_traits = self.stub_traits();
         let sub_services_structs = self.sub_services_structs();
         let request_handlers = self.request_handlers();
         let stubs = self.stubs();
@@ -49,6 +51,7 @@ impl Service {
 
         quote! {
             #server_and_clients_structs
+            #stub_traits
             #sub_services_structs
             #request_handlers
             #stubs

@@ -24,6 +24,7 @@ impl ServiceBuilder {
             sub_services_names,
             &mut errors,
         );
+        self.check_remote_methods_do_not_conflict_with_sub_service_getters(&mut errors);
 
         self.check_server_struct_is_present(&module, &mut errors);
         self.check_client_struct_is_present(&module, &mut errors);
@@ -67,6 +68,31 @@ impl ServiceBuilder {
                 );
                 combine_errors(errors, error);
             });
+    }
+
+    fn check_remote_methods_do_not_conflict_with_sub_service_getters(
+        &self,
+        errors: &mut Option<syn::Error>,
+    ) {
+        for method in self
+            .server_remote_methods
+            .iter()
+            .chain(&self.client_remote_methods)
+        {
+            if self
+                .sub_services
+                .iter()
+                .any(|sub_service| sub_service.name == method.ident)
+            {
+                combine_errors(
+                    errors,
+                    syn::Error::new_spanned(
+                        &method.ident,
+                        "remote method name cannot match a sub-service name",
+                    ),
+                );
+            }
+        }
     }
 
     fn check_server_struct_is_present(&self, module: &ItemMod, errors: &mut Option<syn::Error>) {
