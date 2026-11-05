@@ -85,8 +85,12 @@ impl Frame {
             });
         }
 
-        // TODO consider using try_reserve
-        let mut frame_bytes = Vec::<u8>::with_capacity(size);
+        let mut frame_bytes = Vec::<u8>::new();
+        frame_bytes
+            .try_reserve_exact(size)
+            .map_err(|err| ReadError::AllocateFrameBuffer {
+                allocation_error: err.to_string(),
+            })?;
         stream
             .take(size as u64)
             .read_to_end(&mut frame_bytes)
