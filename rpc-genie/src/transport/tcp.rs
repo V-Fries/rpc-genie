@@ -29,13 +29,17 @@ use crate::{
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let _server_handle = rpc_genie::tcp::start_server(
+///     let server_handle = rpc_genie::tcp::start_server(
 ///         "127.0.0.1:12345",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Server {
 ///             _stream: PhantomData
 ///         })
-///     ).await;
+///     )
+///     .await
+///     .unwrap();
+///
+///     server_handle.stop().await;
 /// }
 /// ```
 pub async fn start_server<

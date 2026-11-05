@@ -32,7 +32,8 @@ use crate::{
 /// #[tokio::main]
 /// async fn main() {
 ///     std::fs::create_dir_all("/tmp/rpc-genie/tests/").unwrap();
-///     rpc_genie::unix_socket::start_server(
+///
+///     let server_handle = rpc_genie::unix_socket::start_server(
 ///         "/tmp/rpc-genie/tests/unix_socket_start_server_doc_test.sock",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Server {
@@ -41,6 +42,8 @@ use crate::{
 ///     )
 ///     .await
 ///     .unwrap();
+///
+///     server_handle.stop().await;
 /// }
 /// ```
 pub async fn start_server<
