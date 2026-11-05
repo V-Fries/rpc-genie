@@ -80,18 +80,18 @@ impl Service {
     }
 
     fn sub_service_getters(&self, generic_stub_struct_name: &TokenStream) -> TokenStream {
-        let getters = self.sub_services.iter().filter_map(
+        let getters = self.sub_services.iter().map(
             |SubService {
                  pub_keyword,
                  name,
                  path,
                  ..
              }| {
-                Some(quote! {
+                quote! {
                     #pub_keyword fn #name(&self) -> &#path::#generic_stub_struct_name<RequestSender> {
                         self.#name.as_ref()
                     }
-                })
+                }
             },
         );
 
