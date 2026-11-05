@@ -198,7 +198,7 @@ fn remote_method_caller(
     }: &RemoteMethod,
     opposite_stub_alias: &str,
 ) -> TokenStream {
-    let output = single_request_sender_output(output);
+    let output = single_request_sender_output(output, quote!(RequestSender));
 
     let args = args.iter().filter(|arg| match arg.ty.deref() {
         Type::Path(type_path) if type_path.path.is_ident(opposite_stub_alias) => {

@@ -80,7 +80,7 @@ fn stub_trait_definition(
 ) -> TokenStream {
     let trait_methods = methods.iter().map(|method| {
         let ident = &method.ident;
-        let output = single_request_sender_output(&method.output);
+        let output = single_request_sender_output(&method.output, quote!(Self::RequestSender));
         let args = visible_args(method, opposite_stub_alias);
         let inputs = args.iter().map(|(name, ty)| quote!(#name: #ty));
 
@@ -94,10 +94,9 @@ fn stub_trait_definition(
     quote! {
         /// Trait for the generated stub's callable remote methods. Implement this trait on a mock
         /// stub to use it in unit tests.
-        pub trait #trait_name<RequestSender>
-        where
-            RequestSender: rpc_genie::send_request::SendRequest,
-        {
+        pub trait #trait_name {
+            type RequestSender: rpc_genie::send_request::SendRequest;
+
             #(#trait_methods)*
             #(#sub_service_getters)*
         }
@@ -114,7 +113,7 @@ fn stub_trait_impl(
 ) -> TokenStream {
     let trait_impl_methods = methods.iter().map(|method| {
         let ident = &method.ident;
-        let output = single_request_sender_output(&method.output);
+        let output = single_request_sender_output(&method.output, quote!(RequestSender));
         let args = visible_args(method, opposite_stub_alias);
         let inputs = args.iter().map(|(name, ty)| quote!(#name: #ty));
         let args = args.iter().map(|(name, _)| name);
@@ -129,10 +128,12 @@ fn stub_trait_impl(
     let sub_service_getter_impls = sub_service_getter_impls(sub_services, child_trait_name);
 
     quote! {
-        impl<RequestSender> #trait_name<RequestSender> for #stub_name<RequestSender>
+        impl<RequestSender> #trait_name for #stub_name<RequestSender>
         where
             RequestSender: rpc_genie::send_request::SendRequest,
         {
+            type RequestSender = RequestSender;
+
             #(#trait_impl_methods)*
             #(#sub_service_getter_impls)*
         }
@@ -150,7 +151,9 @@ fn sub_service_getters(
                 let name = &sub_service.name;
                 let path = &sub_service.path;
                 quote! {
-                    fn #name(&self) -> &impl #path::#child_trait_name<RequestSender>;
+                    fn #name(
+                        &self,
+                    ) -> &impl #path::#child_trait_name<RequestSender = Self::RequestSender>;
                 }
             })
         })
@@ -168,7 +171,9 @@ fn sub_service_getter_impls(
                 let name = &sub_service.name;
                 let path = &sub_service.path;
                 quote! {
-                    fn #name(&self) -> &impl #path::#child_trait_name<RequestSender> {
+                    fn #name(
+                        &self,
+                    ) -> &impl #path::#child_trait_name<RequestSender = RequestSender> {
                         self.#name()
                     }
                 }
