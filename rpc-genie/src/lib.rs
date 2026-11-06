@@ -24,6 +24,9 @@ pub mod frame;
 pub mod client;
 pub mod server;
 
+#[doc(hidden)]
+pub mod mock;
+
 use std::sync::Arc;
 
 /// Generate RPC handlers, client stubs, and state wiring for a service module.

@@ -64,7 +64,6 @@ fn stub_trait(
         sub_services,
         &child_trait_name,
     );
-
     quote! {
         #trait_definition
         #trait_impl
@@ -100,6 +99,7 @@ fn stub_trait_definition(
             #(#trait_methods)*
             #(#sub_service_getters)*
         }
+
     }
 }
 
@@ -182,7 +182,7 @@ fn sub_service_getter_impls(
         .collect()
 }
 
-fn visible_args<'a>(
+pub(super) fn visible_args<'a>(
     method: &'a RemoteMethod,
     opposite_stub_alias: &str,
 ) -> Vec<(syn::Ident, &'a Type)> {
