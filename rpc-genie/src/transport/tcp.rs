@@ -10,8 +10,10 @@ use crate::{
 
 /// Bind a TCP listener and start serving requests in the background.
 ///
-/// The returned [`server::ServerHandle`] owns the server task. Dropping it
-/// stops the task; use `wait_until_stopped` to keep the server running.
+/// The returned [`server::ServerHandle`] owns the server listener task. Dropping
+/// it requests shutdown; use [`server::ServerHandle::stop`] to request shutdown
+/// and wait for the listener task to exit, or `wait_until_stopped` to wait for
+/// the listener task to stop on its own.
 ///
 /// # Example
 /// ```rust
@@ -27,13 +29,17 @@ use crate::{
 ///
 /// #[tokio::main]
 /// async fn main() {
-///     let _server_handle = rpc_genie::tcp::start_server(
+///     let server_handle = rpc_genie::tcp::start_server(
 ///         "127.0.0.1:12345",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Server {
 ///             _stream: PhantomData
 ///         })
-///     ).await;
+///     )
+///     .await
+///     .unwrap();
+///
+///     server_handle.stop().await;
 /// }
 /// ```
 pub async fn start_server<

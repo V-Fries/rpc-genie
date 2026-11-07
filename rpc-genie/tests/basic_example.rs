@@ -186,7 +186,7 @@ async fn server_tests(
     .await
     .expect("client was not removed from topic");
 
-    server_handle.stop();
+    server_handle.stop().await;
 }
 
 async fn client(

@@ -12,8 +12,10 @@ use crate::{
 
 /// Bind a Unix socket and start serving requests in the background.
 ///
-/// The returned [`server::ServerHandle`] owns the server task. Dropping it
-/// stops the task; use `wait_until_stopped` to keep the server running.
+/// The returned [`server::ServerHandle`] owns the server listener task. Dropping
+/// it requests shutdown; use [`server::ServerHandle::stop`] to request shutdown
+/// and wait for the listener task to exit, or `wait_until_stopped` to wait for
+/// the listener task to stop on its own.
 ///
 /// # Example
 /// ```rust
@@ -30,7 +32,8 @@ use crate::{
 /// #[tokio::main]
 /// async fn main() {
 ///     std::fs::create_dir_all("/tmp/rpc-genie/tests/").unwrap();
-///     rpc_genie::unix_socket::start_server(
+///
+///     let server_handle = rpc_genie::unix_socket::start_server(
 ///         "/tmp/rpc-genie/tests/unix_socket_start_server_doc_test.sock",
 ///         MAX_FRAME_SIZE,
 ///         Arc::new(service::Server {
@@ -39,6 +42,8 @@ use crate::{
 ///     )
 ///     .await
 ///     .unwrap();
+///
+///     server_handle.stop().await;
 /// }
 /// ```
 pub async fn start_server<

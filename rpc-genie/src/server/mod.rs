@@ -3,7 +3,8 @@ pub use listener::Listener;
 
 use tokio::{
     io::{AsyncRead, AsyncWrite},
-    task::{JoinError, JoinHandle},
+    sync::mpsc,
+    task::JoinHandle,
 };
 
 use std::{
@@ -25,9 +26,45 @@ pub enum Error {
     },
 }
 
+type ServerListenRoutineShutdownMsgSender = mpsc::UnboundedSender<()>;
+type ServerListenRoutineShutdownMsgReceiver = mpsc::UnboundedReceiver<()>;
+
+struct ServerListenRoutineJoinHandle {
+    raw_join_handle: JoinHandle<()>,
+    shutdown_msg_sender: ServerListenRoutineShutdownMsgSender,
+}
+
+impl ServerListenRoutineJoinHandle {
+    const LISTEN_ROUTINE_IS_DOWN_ERROR_MSG: &'static str = "server listen routine is down";
+
+    fn stop(self) {
+        self.shutdown_msg_sender
+            .send(())
+            .expect(Self::LISTEN_ROUTINE_IS_DOWN_ERROR_MSG)
+    }
+
+    async fn wait_until_stopped(self) {
+        self.raw_join_handle
+            .await
+            .expect(Self::LISTEN_ROUTINE_IS_DOWN_ERROR_MSG)
+    }
+
+    async fn stop_and_join(self) {
+        self.shutdown_msg_sender
+            .send(())
+            .expect(Self::LISTEN_ROUTINE_IS_DOWN_ERROR_MSG);
+
+        self.raw_join_handle
+            .await
+            .expect(Self::LISTEN_ROUTINE_IS_DOWN_ERROR_MSG)
+    }
+}
+
 /// Handle to a running RPC server.
 ///
-/// Dropping the `ServerHandle` aborts the server task and disconnects its clients.
+/// Dropping the `ServerHandle` requests shutdown of the server listener task and disconnects
+/// connected clients. Use [`ServerHandle::stop`] to request shutdown and wait for the listener
+/// task to exit.
 ///
 /// The [`service`](crate::service) macro generates an alias for the current service so you never
 /// have to type out the full type.
@@ -66,7 +103,7 @@ where
     Stub: SubscribableStub,
     Listener: listener::Listener,
 {
-    join_handle: Option<JoinHandle<()>>,
+    join_handle: Option<ServerListenRoutineJoinHandle>,
     addr: String,
     topic: Arc<Topic<Stub>>,
     pub state: Arc<ServerState>,
@@ -80,7 +117,7 @@ where
 {
     fn drop(&mut self) {
         if let Some(join_handle) = self.join_handle.take() {
-            join_handle.abort();
+            join_handle.stop();
         }
         Listener::on_routine_end(&self.addr)
     }
@@ -91,19 +128,23 @@ where
     Stub: SubscribableStub,
     Listener: listener::Listener<Stream = Stream>,
 {
-    /// Wait for the server task to stop and return its join result.
-    pub async fn wait_until_stopped(mut self) -> Result<(), JoinError> {
+    /// Wait for the server listener task to stop.
+    pub async fn wait_until_stopped(mut self) {
         self.join_handle
             .take()
             .expect("join_handle should never be None")
+            .wait_until_stopped()
             .await
     }
 
-    /// Stops the server.
-    ///
-    /// Dropping the `ServerHandle` has the same effect as calling this method.
-    pub fn stop(self) {
-        // routine will be aborted automatically on drop
+    /// Requests that the server stop accepting new clients, then waits for its listener task to
+    /// exit. Dropping the handle also disconnects connected clients.
+    pub async fn stop(mut self) {
+        self.join_handle
+            .take()
+            .expect("join_handle should never be None")
+            .stop_and_join()
+            .await
     }
 }
 
@@ -176,10 +217,12 @@ where
 
     let topic = Arc::new(Topic::new().await);
 
+    let (shutdown_msg_sender, shutdown_msg_receiver) = mpsc::unbounded_channel();
+
     let topic_weak_ref = Arc::downgrade(&topic);
     let server_state_clone = Arc::clone(&server_state);
-    let join_handle = tokio::spawn(async move {
-        server_routine::<
+    let raw_join_handle = tokio::spawn(async move {
+        server_listen_routine::<
             Listener,
             Server,
             Stream,
@@ -187,12 +230,21 @@ where
             ClientStubArcHandle,
             ClientStubWeakHandle,
             SubServices,
-        >(listener, max_frame_size, server_state_clone, topic_weak_ref)
+        >(
+            listener,
+            shutdown_msg_receiver,
+            max_frame_size,
+            server_state_clone,
+            topic_weak_ref,
+        )
         .await
     });
 
     Ok(ServerHandle {
-        join_handle: Some(join_handle),
+        join_handle: Some(ServerListenRoutineJoinHandle {
+            raw_join_handle,
+            shutdown_msg_sender,
+        }),
         addr: addr.to_owned(),
         topic,
         state: server_state,
@@ -200,7 +252,7 @@ where
     })
 }
 
-async fn server_routine<
+async fn server_listen_routine<
     Listener,
     Server,
     Stream,
@@ -210,6 +262,7 @@ async fn server_routine<
     SubServices,
 >(
     listener: Listener,
+    mut shutdown_msg_receiver: ServerListenRoutineShutdownMsgReceiver,
     max_frame_size: usize,
     server_state: Arc<Server>,
     topic: Weak<Topic<ClientStubArcHandle>>,
@@ -226,17 +279,23 @@ async fn server_routine<
     let request_handler = server_state.into_request_handler(None);
 
     loop {
-        let client_stream = listener.accept().await;
+        let client_stream = tokio::select! {
+            biased;
+
+            _ = shutdown_msg_receiver.recv() => break,
+
+            client_stream = listener.accept() => client_stream,
+        };
+
+        let Some(topic) = topic.upgrade() else {
+            break;
+        };
 
         let request_handler_clone = Arc::clone(&request_handler);
 
         let client_id = StreamId::next();
         // TODO use a logging crate
         // println!("Client connected: {}", client_id);
-
-        let Some(topic) = topic.upgrade() else {
-            return;
-        };
 
         let weak_topic = Arc::downgrade(&topic);
         topic

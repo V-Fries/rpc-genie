@@ -127,5 +127,5 @@ async fn counter_test() {
     .await
     .expect("client never received the new count");
 
-    server_handle.stop();
+    server_handle.stop().await;
 }
