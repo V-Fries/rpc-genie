@@ -11,6 +11,8 @@ pub enum ReadError {
         expected_size: usize,
         data_size: usize,
     },
+    #[error("Failed to allocate memory for frame buffer: {allocation_error}")]
+    AllocateFrameBuffer { allocation_error: String },
     #[error("Failed to read frame")]
     ReadFrame { io_error: String },
     #[error("Failed to deserialize frame: {deserialize_error}")]
