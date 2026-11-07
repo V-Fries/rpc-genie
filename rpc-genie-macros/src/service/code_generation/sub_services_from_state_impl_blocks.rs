@@ -40,7 +40,7 @@ impl Service {
             {
                 fn from_state(
                     state: std::sync::Arc<#state_struct_name<Stream>>,
-                    service_path: Option<&str>
+                    service_path: Option<&'static str>
                 ) -> Self {
                     #sub_service_struct_creation_ast
                 }
@@ -78,9 +78,16 @@ impl Service {
                     #name: {
                         let service_path = match service_path {
                             Some(service_path) => {
-                                service_path.to_owned() + #str_to_add_to_service_path
+                                // Sub-services of a sub-service get their path prefix at
+                                // runtime. Leak the tiny concatenated path so it can be
+                                // stored as a `&'static str`; this runs once per request
+                                // handler construction.
+                                let service_path: &'static str =
+                                    (service_path.to_owned() + #str_to_add_to_service_path)
+                                        .leak();
+                                service_path
                             },
-                            None => #str_to_add_to_service_path.to_owned(),
+                            None => concat!(#str_to_add_to_service_path),
                         };
 
                         std::sync::Arc::clone(&state.#name)

@@ -123,7 +123,7 @@ fn into_request_handler_impl_blocks() -> TokenStream {
             {
                 fn into_request_handler(
                     self: std::sync::Arc<Self>,
-                    service_path: Option<String>
+                    service_path: Option<&'static str>
                 ) -> std::sync::Arc<#request_handler_struct_name<Stream>> {
                     use rpc_genie::SubServicesFromState;
 
@@ -131,7 +131,7 @@ fn into_request_handler_impl_blocks() -> TokenStream {
                         state: std::sync::Arc::clone(&self),
                         sub_services: #associated_sub_services_struct_name::from_state(
                             self,
-                            service_path.as_deref(),
+                            service_path,
                         ),
                         service_path,
                     })

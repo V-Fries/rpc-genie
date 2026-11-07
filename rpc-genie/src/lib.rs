@@ -165,12 +165,15 @@ pub trait IntoRequestHandler<RequestHandler, SubServices: SubServicesFromState<S
 where
     Self: Sized,
 {
-    fn into_request_handler(self: Arc<Self>, service_path: Option<String>) -> Arc<RequestHandler>;
+    fn into_request_handler(
+        self: Arc<Self>,
+        service_path: Option<&'static str>,
+    ) -> Arc<RequestHandler>;
 }
 
 #[doc(hidden)]
 pub trait SubServicesFromState<State> {
-    fn from_state(state: Arc<State>, service_path: Option<&str>) -> Self;
+    fn from_state(state: Arc<State>, service_path: Option<&'static str>) -> Self;
 }
 
 #[doc(hidden)]
@@ -200,7 +203,7 @@ where
     Self: Clone + Send + 'static + Sync,
     RequestSender: send_request::SendRequest,
 {
-    fn new(request_sender: RequestSender, service_path: Option<String>) -> Self;
+    fn new(request_sender: RequestSender, service_path: Option<&'static str>) -> Self;
 }
 
 #[doc(hidden)]

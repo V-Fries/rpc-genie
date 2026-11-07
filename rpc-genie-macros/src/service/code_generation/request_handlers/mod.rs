@@ -88,7 +88,7 @@ fn request_handler_struct_definition(
         where
             Stream: Send,
         {
-            pub service_path: Option<String>,
+            pub service_path: Option<&'static str>,
             pub state: std::sync::Arc<#associated_state_struct_name<Stream>>,
             pub sub_services: #associated_sub_service_struct_name<Stream>,
         }

@@ -40,7 +40,7 @@ impl Clone for TestStubWeakHandle {
 }
 
 impl Stub<Weak<TestHandle>> for TestStubWeakHandle {
-    fn new(request_sender: Weak<TestHandle>, _service_path: Option<String>) -> Self {
+    fn new(request_sender: Weak<TestHandle>, _service_path: Option<&'static str>) -> Self {
         Self(request_sender)
     }
 }
@@ -97,7 +97,7 @@ impl Clone for TestStubArcHandle {
 }
 
 impl Stub<Arc<TestHandle>> for TestStubArcHandle {
-    fn new(request_sender: Arc<TestHandle>, _service_path: Option<String>) -> Self {
+    fn new(request_sender: Arc<TestHandle>, _service_path: Option<&'static str>) -> Self {
         Self(request_sender)
     }
 }

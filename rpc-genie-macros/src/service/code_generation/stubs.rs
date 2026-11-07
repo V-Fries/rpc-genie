@@ -52,7 +52,7 @@ impl Service {
                 #[doc(hidden)]
                 __rpc_genie_request_sender__: RequestSender,
                 #[doc(hidden)]
-                __rpc_service_path__: Option<String>,
+                __rpc_service_path__: Option<&'static str>,
                 #sub_services_stub_fields
             }
 
@@ -108,10 +108,17 @@ impl Service {
                         #path::#generic_stub_struct_name::<RequestSender>::new(
                             request_sender.clone(),
                             Some(match service_path {
-                                Some(ref service_path) => {
-                                    service_path.to_owned() + #str_to_add_to_service_path
+                                Some(service_path) => {
+                                    // Sub-services of a sub-service get their path prefix at
+                                    // runtime. Leak the tiny concatenated path so it can be
+                                    // stored as a `&'static str`; this runs once per stub
+                                    // construction.
+                                    let service_path: &'static str =
+                                        (service_path.to_owned() + #str_to_add_to_service_path)
+                                            .leak();
+                                    service_path
                                 }
-                                None => #str_to_add_to_service_path.to_owned(),
+                                None => concat!(#str_to_add_to_service_path),
                             })
                         )
                     )
@@ -125,7 +132,7 @@ impl Service {
             where
                 RequestSender: rpc_genie::send_request::SendRequest,
             {
-                fn new(request_sender: RequestSender, service_path: Option<String>) -> Self {
+                fn new(request_sender: RequestSender, service_path: Option<&'static str>) -> Self {
                     Self {
                         #(#field_constructor,)*
                         __rpc_genie_request_sender__: request_sender,
@@ -198,7 +205,7 @@ fn remote_method_caller(
                     // No need to add "/" as it already present at the end of the path
                     .method_path(
                         match self.__rpc_service_path__ {
-                            Some(ref service_path) => {
+                            Some(service_path) => {
                                 service_path.to_owned() + #method_name_as_lit_str
                             }
                             None => #method_name_as_lit_str.to_owned(),
