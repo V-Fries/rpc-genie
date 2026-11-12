@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, hash_map},
     mem,
     ops::Deref,
-    sync::{Arc, Mutex as StdMutex, Weak},
+    sync::{Arc, Mutex as StdMutex, PoisonError, Weak},
 };
 
 use tokio::{
@@ -120,7 +120,7 @@ impl<Stream> Handle<Stream> {
         let mut registered_topics_lock = self
             .registered_topics
             .lock()
-            .unwrap_or_else(|poison_error| poison_error.into_inner());
+            .unwrap_or_else(PoisonError::into_inner);
 
         mem::take(&mut *registered_topics_lock).send_death_notifications(self.stream_id);
     }
@@ -414,7 +414,7 @@ where
         // MAKE SURE NOT TO AWAIT ANYTHING WHILE THIS MUTEX IS HELD
         self.registered_topics
             .lock()
-            .unwrap_or_else(|poison_error| poison_error.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .add(topic_id, stub_died_notification_sender);
 
         true
@@ -424,7 +424,7 @@ where
         // MAKE SURE NOT TO AWAIT ANYTHING WHILE THIS MUTEX IS HELD
         self.registered_topics
             .lock()
-            .unwrap_or_else(|poison_error| poison_error.into_inner())
+            .unwrap_or_else(PoisonError::into_inner)
             .remove(topic_id)
     }
 
