@@ -240,29 +240,15 @@ async fn client_tests(
     server_doesnt_need_client_anymore_receiver: tokio::sync::oneshot::Receiver<()>,
 ) {
     use rpc_genie::SendSingleRequest as _;
+    use service_a::ServerStub as _;
 
     // You can then call the server's remote method directly
-    assert_eq!(
-        "server",
-        client_handle
-            .server_stub
-            .server_name()
-            .call()
-            .await
-            .unwrap()
-    );
-    assert_eq!(
-        42,
-        client_handle.server_stub.add(40, 2).call().await.unwrap()
-    );
-    assert_eq!(
-        42,
-        client_handle.server_stub.add_4(38).call().await.unwrap()
-    );
+    assert_eq!("server", client_handle.server_name().call().await.unwrap());
+    assert_eq!(42, client_handle.add(40, 2).call().await.unwrap());
+    assert_eq!(42, client_handle.add_4(38).call().await.unwrap());
     assert_eq!(
         1,
         client_handle
-            .server_stub
             .access_sub_service_1_state()
             .call()
             .await
@@ -271,7 +257,6 @@ async fn client_tests(
     assert_eq!(
         2,
         client_handle
-            .server_stub
             .access_sub_service_2_state()
             .call()
             .await
@@ -281,7 +266,6 @@ async fn client_tests(
     // use notify if you don't care about the result and don't need to check whether the server
     // received the request
     client_handle
-        .server_stub
         .complicated_pattern_arg((42, ("hey".to_string(), 4.)))
         .notify()
         .await
