@@ -15,7 +15,6 @@ impl Service {
             quote!(ServerStubImpl),
             "ClientStub",
             &self.sub_services,
-            quote!(ServerStub),
         );
 
         let client_stub_trait = stub_trait(
@@ -24,7 +23,6 @@ impl Service {
             quote!(ClientStubImpl),
             "ServerStub",
             &self.sub_services,
-            quote!(ClientStub),
         );
 
         quote! {
@@ -40,20 +38,14 @@ fn stub_trait(
     stub_name: TokenStream,
     opposite_stub_alias: &str,
     sub_services: &[SubService],
-    child_trait_name: TokenStream,
 ) -> TokenStream {
     let methods = methods
         .iter()
         .filter(|method| matches!(&method.vis, syn::Visibility::Public(_)))
         .collect::<Vec<_>>();
 
-    let trait_definition = stub_trait_definition(
-        &methods,
-        &trait_name,
-        opposite_stub_alias,
-        sub_services,
-        &child_trait_name,
-    );
+    let trait_definition =
+        stub_trait_definition(&methods, &trait_name, opposite_stub_alias, sub_services);
 
     let trait_impl = stub_trait_impl(
         &methods,
@@ -61,8 +53,8 @@ fn stub_trait(
         &stub_name,
         opposite_stub_alias,
         sub_services,
-        &child_trait_name,
     );
+
     quote! {
         #trait_definition
         #trait_impl
@@ -74,7 +66,6 @@ fn stub_trait_definition(
     trait_name: &TokenStream,
     opposite_stub_alias: &str,
     sub_services: &[SubService],
-    child_trait_name: &TokenStream,
 ) -> TokenStream {
     let trait_methods = methods.iter().map(|method| {
         let ident = &method.ident;
@@ -89,7 +80,7 @@ fn stub_trait_definition(
         }
     });
 
-    let sub_service_getters = sub_service_getters(sub_services, child_trait_name);
+    let sub_service_getters = sub_service_getters(trait_name, sub_services);
 
     quote! {
         /// Trait for the generated stub's callable remote methods. Implement this trait on a mock
@@ -108,7 +99,6 @@ fn stub_trait_impl(
     stub_name: &TokenStream,
     opposite_stub_alias: &str,
     sub_services: &[SubService],
-    child_trait_name: &TokenStream,
 ) -> TokenStream {
     let trait_impl_methods = methods.iter().map(|method| {
         let ident = &method.ident;
@@ -126,7 +116,7 @@ fn stub_trait_impl(
         }
     });
 
-    let sub_service_getter_impls = sub_service_getter_impls(sub_services, child_trait_name);
+    let sub_service_getter_impls = sub_service_getter_impls(trait_name, sub_services);
 
     quote! {
         impl<RequestSender> #trait_name for #stub_name<RequestSender>
@@ -139,10 +129,7 @@ fn stub_trait_impl(
     }
 }
 
-fn sub_service_getters(
-    sub_services: &[SubService],
-    child_trait_name: &TokenStream,
-) -> Vec<TokenStream> {
+fn sub_service_getters(trait_name: &TokenStream, sub_services: &[SubService]) -> Vec<TokenStream> {
     sub_services
         .iter()
         .filter_map(|sub_service| {
@@ -150,7 +137,7 @@ fn sub_service_getters(
                 let name = &sub_service.name;
                 let path = &sub_service.path;
                 quote! {
-                    fn #name(&self) -> &impl #path::#child_trait_name;
+                    fn #name(&self) -> &impl #path::#trait_name;
                 }
             })
         })
@@ -158,8 +145,8 @@ fn sub_service_getters(
 }
 
 fn sub_service_getter_impls(
+    trait_name: &TokenStream,
     sub_services: &[SubService],
-    child_trait_name: &TokenStream,
 ) -> Vec<TokenStream> {
     sub_services
         .iter()
@@ -168,7 +155,7 @@ fn sub_service_getter_impls(
                 let name = &sub_service.name;
                 let path = &sub_service.path;
                 quote! {
-                    fn #name(&self) -> &impl #path::#child_trait_name {
+                    fn #name(&self) -> &impl #path::#trait_name {
                         self.#name()
                     }
                 }
