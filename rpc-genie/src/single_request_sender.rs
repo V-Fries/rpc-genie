@@ -34,6 +34,7 @@ pub trait SendSingleRequest<ResponseType> {
 /// ```rust
 /// use std::{sync::Arc, marker::PhantomData};
 /// use rpc_genie::SendSingleRequest as _;
+/// use service::ServerStub as _;
 ///
 /// #[rpc_genie::service]
 /// mod service {
@@ -62,7 +63,7 @@ pub trait SendSingleRequest<ResponseType> {
 ///     };
 ///
 ///     // You get a SingleRequestSender whenever you call a remote method.
-///     let request_sender: rpc_genie::SingleRequestSender<_, _> = client_handle.server_stub.foo();
+///     let request_sender = client_handle.foo();
 ///     request_sender.notify().await.unwrap();
 /// }
 /// ```

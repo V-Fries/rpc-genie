@@ -15,7 +15,7 @@ impl Service {
             quote!(ServerStubImpl),
             "ClientStub",
             &self.sub_services,
-            quote!(ServerStub),
+            true,
         );
 
         let client_stub_trait = stub_trait(
@@ -24,7 +24,7 @@ impl Service {
             quote!(ClientStubImpl),
             "ServerStub",
             &self.sub_services,
-            quote!(ClientStub),
+            false,
         );
 
         quote! {
@@ -40,32 +40,34 @@ fn stub_trait(
     stub_name: TokenStream,
     opposite_stub_alias: &str,
     sub_services: &[SubService],
-    child_trait_name: TokenStream,
+    should_impl_trait_for_client_handle: bool,
 ) -> TokenStream {
     let methods = methods
         .iter()
         .filter(|method| matches!(&method.vis, syn::Visibility::Public(_)))
         .collect::<Vec<_>>();
 
-    let trait_definition = stub_trait_definition(
-        &methods,
-        &trait_name,
-        opposite_stub_alias,
-        sub_services,
-        &child_trait_name,
-    );
+    let trait_definition =
+        stub_trait_definition(&methods, &trait_name, opposite_stub_alias, sub_services);
 
-    let trait_impl = stub_trait_impl(
+    let trait_impl = impl_trait_for_stub(
         &methods,
         &trait_name,
         &stub_name,
         opposite_stub_alias,
         sub_services,
-        &child_trait_name,
     );
+
+    let stub_trait_impl_for_client_handle = if should_impl_trait_for_client_handle {
+        impl_trait_for_client_handle(&methods, &trait_name, opposite_stub_alias, sub_services)
+    } else {
+        quote!()
+    };
+
     quote! {
         #trait_definition
         #trait_impl
+        #stub_trait_impl_for_client_handle
     }
 }
 
@@ -74,7 +76,6 @@ fn stub_trait_definition(
     trait_name: &TokenStream,
     opposite_stub_alias: &str,
     sub_services: &[SubService],
-    child_trait_name: &TokenStream,
 ) -> TokenStream {
     let trait_methods = methods.iter().map(|method| {
         let ident = &method.ident;
@@ -89,7 +90,7 @@ fn stub_trait_definition(
         }
     });
 
-    let sub_service_getters = sub_service_getters(sub_services, child_trait_name);
+    let sub_service_getters = sub_service_getters(trait_name, sub_services);
 
     quote! {
         /// Trait for the generated stub's callable remote methods. Implement this trait on a mock
@@ -102,13 +103,76 @@ fn stub_trait_definition(
     }
 }
 
-fn stub_trait_impl(
+fn sub_service_getters(trait_name: &TokenStream, sub_services: &[SubService]) -> Vec<TokenStream> {
+    sub_services
+        .iter()
+        .filter_map(|sub_service| {
+            sub_service.pub_keyword.as_ref().map(|_| {
+                let name = &sub_service.name;
+                let path = &sub_service.path;
+                quote! {
+                    fn #name(&self) -> &impl #path::#trait_name;
+                }
+            })
+        })
+        .collect()
+}
+
+fn impl_trait_for_stub(
     methods: &[&RemoteMethod],
     trait_name: &TokenStream,
     stub_name: &TokenStream,
     opposite_stub_alias: &str,
     sub_services: &[SubService],
-    child_trait_name: &TokenStream,
+) -> TokenStream {
+    let methods = stub_trait_methods(
+        methods,
+        trait_name,
+        opposite_stub_alias,
+        sub_services,
+        quote!(self),
+    );
+
+    quote! {
+        impl<RequestSender> #trait_name for #stub_name<RequestSender>
+        where
+            RequestSender: rpc_genie::send_request::SendRequest,
+        {
+            #methods
+        }
+    }
+}
+
+fn impl_trait_for_client_handle(
+    methods: &[&RemoteMethod],
+    trait_name: &TokenStream,
+    opposite_stub_alias: &str,
+    sub_services: &[SubService],
+) -> TokenStream {
+    let methods = stub_trait_methods(
+        methods,
+        trait_name,
+        opposite_stub_alias,
+        sub_services,
+        quote!(self.server_stub),
+    );
+
+    quote! {
+        impl<Stub, Client> #trait_name for rpc_genie::client::ClientHandle<Stub, Client>
+        where
+            Stub: #trait_name
+        {
+            #methods
+        }
+    }
+}
+
+fn stub_trait_methods(
+    methods: &[&RemoteMethod],
+    trait_name: &TokenStream,
+    opposite_stub_alias: &str,
+    sub_services: &[SubService],
+    path_to_redirect_method_calls: TokenStream,
 ) -> TokenStream {
     let trait_impl_methods = methods.iter().map(|method| {
         let ident = &method.ident;
@@ -121,45 +185,24 @@ fn stub_trait_impl(
 
         quote! {
             fn #ident(&self, #(#inputs),*) #output {
-                self.#ident(#(#args),*)
+                #path_to_redirect_method_calls.#ident(#(#args),*)
             }
         }
     });
 
-    let sub_service_getter_impls = sub_service_getter_impls(sub_services, child_trait_name);
+    let sub_service_getter_impls =
+        sub_service_getter_impls(trait_name, &path_to_redirect_method_calls, sub_services);
 
     quote! {
-        impl<RequestSender> #trait_name for #stub_name<RequestSender>
-        where
-            RequestSender: rpc_genie::send_request::SendRequest,
-        {
-            #(#trait_impl_methods)*
-            #(#sub_service_getter_impls)*
-        }
+        #(#trait_impl_methods)*
+        #(#sub_service_getter_impls)*
     }
 }
 
-fn sub_service_getters(
-    sub_services: &[SubService],
-    child_trait_name: &TokenStream,
-) -> Vec<TokenStream> {
-    sub_services
-        .iter()
-        .filter_map(|sub_service| {
-            sub_service.pub_keyword.as_ref().map(|_| {
-                let name = &sub_service.name;
-                let path = &sub_service.path;
-                quote! {
-                    fn #name(&self) -> &impl #path::#child_trait_name;
-                }
-            })
-        })
-        .collect()
-}
-
 fn sub_service_getter_impls(
+    trait_name: &TokenStream,
+    path_to_redirect_method_calls: &TokenStream,
     sub_services: &[SubService],
-    child_trait_name: &TokenStream,
 ) -> Vec<TokenStream> {
     sub_services
         .iter()
@@ -168,8 +211,8 @@ fn sub_service_getter_impls(
                 let name = &sub_service.name;
                 let path = &sub_service.path;
                 quote! {
-                    fn #name(&self) -> &impl #path::#child_trait_name {
-                        self.#name()
+                    fn #name(&self) -> &impl #path::#trait_name {
+                        #path_to_redirect_method_calls.#name()
                     }
                 }
             })

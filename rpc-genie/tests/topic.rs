@@ -57,6 +57,7 @@ const MAX_FRAME_SIZE: usize = 1024;
 
 #[tokio::test]
 async fn counter_test() {
+    use counter::ServerStub as _;
     use std::{
         sync::{
             Arc,
@@ -96,8 +97,8 @@ async fn counter_test() {
     .await
     .expect("client failed to connect to server");
 
-    client_handle.server_stub.subscribe().call().await.unwrap();
-    client_handle.server_stub.increment().call().await.unwrap();
+    client_handle.subscribe().call().await.unwrap();
+    client_handle.increment().call().await.unwrap();
 
     timeout(Duration::from_secs(1), async {
         loop {
@@ -109,18 +110,13 @@ async fn counter_test() {
     .await
     .expect("client never received the new count");
 
-    client_handle
-        .server_stub
-        .unsubscribe()
-        .call()
-        .await
-        .unwrap();
-    client_handle.server_stub.increment().call().await.unwrap();
+    client_handle.unsubscribe().call().await.unwrap();
+    client_handle.increment().call().await.unwrap();
     sleep(Duration::from_secs(1)).await;
     // since we unsubscribed, we shouldn't have received the update
     assert_eq!(client_handle.state.count.load(atomic::Ordering::Relaxed), 1);
 
-    client_handle.server_stub.subscribe().call().await.unwrap();
+    client_handle.subscribe().call().await.unwrap();
     timeout(Duration::from_secs(1), async {
         loop {
             if client_handle.state.count.load(atomic::Ordering::Relaxed) == 2 {

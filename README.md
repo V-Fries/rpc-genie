@@ -113,6 +113,7 @@ mod services {
 use tokio::{task::JoinHandle, sync::oneshot};
 use rpc_genie::{SendSingleRequest as _, Topic};
 use std::{time::Duration, sync::Arc, marker::PhantomData};
+use services::a::ServerStub as _;
 
 const MAX_FRAME_SIZE: usize = 1024 * 1024;
 const ADDR: &str = "127.0.0.1:45864";
@@ -205,24 +206,11 @@ async fn client(server_doesnt_need_client_anymore_receiver: oneshot::Receiver<()
     .expect("client failed to connect to server");
 
     // You can then call the server's remote method directly
-    assert_eq!(
-        "server",
-        client_handle
-            .server_stub
-            .get_server_name()
-            .call()
-            .await
-            .unwrap()
-    );
+    assert_eq!("server", client_handle.get_server_name().call().await.unwrap());
 
     // use notify if you don't care about the result and don't need to check whether the server
     // received the request
-    let () = client_handle
-        .server_stub
-        .get_server_name()
-        .notify()
-        .await
-        .unwrap();
+    let () = client_handle.get_server_name().notify().await.unwrap();
 
     server_doesnt_need_client_anymore_receiver.await.unwrap();
 }
