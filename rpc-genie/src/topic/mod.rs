@@ -27,6 +27,7 @@ mod test;
 /// #[rpc_genie::service]
 /// mod message_publisher {
 ///     use std::sync::Arc;
+///     use rpc_genie::SendSingleRequest as _;
 ///
 ///     pub struct Server<Stream> {
 ///         topic: Topic,

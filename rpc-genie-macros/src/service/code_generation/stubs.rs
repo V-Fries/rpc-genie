@@ -2,12 +2,9 @@ use std::ops::Deref;
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{LitStr, Type};
+use syn::{LitStr, ReturnType, Type};
 
-use crate::service::{
-    RemoteMethod, Service, SubService,
-    code_generation::utils::{ident_to_lit_str, single_request_sender_output},
-};
+use crate::service::{RemoteMethod, Service, SubService, code_generation::utils::ident_to_lit_str};
 
 impl Service {
     pub fn stubs(&self) -> TokenStream {
@@ -198,7 +195,14 @@ fn remote_method_caller(
     }: &RemoteMethod,
     opposite_stub_alias: &str,
 ) -> TokenStream {
-    let output = single_request_sender_output(output, quote!(RequestSender));
+    let output = match output {
+        ReturnType::Default => {
+            quote!(-> rpc_genie::SingleRequestSender<RequestSender, ()>)
+        }
+        ReturnType::Type(arrow, output_type) => {
+            quote!(#arrow rpc_genie::SingleRequestSender<RequestSender, #output_type>)
+        }
+    };
 
     let args = args.iter().filter(|arg| match arg.ty.deref() {
         Type::Path(type_path) if type_path.path.is_ident(opposite_stub_alias) => {

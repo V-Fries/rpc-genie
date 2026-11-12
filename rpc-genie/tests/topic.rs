@@ -1,5 +1,9 @@
+use rpc_genie::SendSingleRequest as _;
+
 #[rpc_genie::service]
 mod counter {
+    use rpc_genie::SendSingleRequest as _;
+
     pub struct Server<Stream> {
         pub count: std::sync::atomic::AtomicU64,
         pub topic: Topic,

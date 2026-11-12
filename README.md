@@ -15,6 +15,8 @@ This crate is currently is final stages of testing before publishing version 0.1
 mod services {
     #[rpc_genie::service]
     pub mod a {
+        use rpc_genie::SendSingleRequest as _;
+
         // Define other services to include in the current service
         sub_services! {
             // Can have any number of sub services
@@ -70,6 +72,7 @@ mod services {
     #[rpc_genie::service]
     pub mod message_publisher {
         use std::sync::Arc;
+        use rpc_genie::SendSingleRequest as _;
 
         pub struct Server<Stream> {
             // topic makes it trivial to write pub/subs
@@ -108,7 +111,7 @@ mod services {
 }
 
 use tokio::{task::JoinHandle, sync::oneshot};
-use rpc_genie::Topic;
+use rpc_genie::{SendSingleRequest as _, Topic};
 use std::{time::Duration, sync::Arc, marker::PhantomData};
 
 const MAX_FRAME_SIZE: usize = 1024 * 1024;

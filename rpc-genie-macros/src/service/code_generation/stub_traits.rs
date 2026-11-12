@@ -1,10 +1,9 @@
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
-use syn::{Pat, Type};
+use syn::{Pat, PatType, ReturnType, Type, token::Colon};
 
 use crate::{
     Service,
-    service::code_generation::utils::single_request_sender_output,
     service::{RemoteMethod, SubService},
 };
 
@@ -64,7 +63,6 @@ fn stub_trait(
         sub_services,
         &child_trait_name,
     );
-
     quote! {
         #trait_definition
         #trait_impl
@@ -80,9 +78,11 @@ fn stub_trait_definition(
 ) -> TokenStream {
     let trait_methods = methods.iter().map(|method| {
         let ident = &method.ident;
-        let output = single_request_sender_output(&method.output, quote!(Self::RequestSender));
-        let args = visible_args(method, opposite_stub_alias);
-        let inputs = args.iter().map(|(name, ty)| quote!(#name: #ty));
+        let output = send_single_request_output(&method.output);
+        let args = visible_args(&method.args, opposite_stub_alias);
+        let inputs = args
+            .iter()
+            .map(|(name, colon, ty)| quote!(#name #colon #ty));
 
         quote! {
             fn #ident(&self, #(#inputs),*) #output;
@@ -95,11 +95,10 @@ fn stub_trait_definition(
         /// Trait for the generated stub's callable remote methods. Implement this trait on a mock
         /// stub to use it in unit tests.
         pub trait #trait_name {
-            type RequestSender: rpc_genie::send_request::SendRequest;
-
             #(#trait_methods)*
             #(#sub_service_getters)*
         }
+
     }
 }
 
@@ -113,10 +112,12 @@ fn stub_trait_impl(
 ) -> TokenStream {
     let trait_impl_methods = methods.iter().map(|method| {
         let ident = &method.ident;
-        let output = single_request_sender_output(&method.output, quote!(RequestSender));
-        let args = visible_args(method, opposite_stub_alias);
-        let inputs = args.iter().map(|(name, ty)| quote!(#name: #ty));
-        let args = args.iter().map(|(name, _)| name);
+        let output = send_single_request_output(&method.output);
+        let args = visible_args(&method.args, opposite_stub_alias);
+        let inputs = args
+            .iter()
+            .map(|(name, colon, ty)| quote!(#name #colon #ty));
+        let args = args.iter().map(|(name, _, _)| name);
 
         quote! {
             fn #ident(&self, #(#inputs),*) #output {
@@ -132,8 +133,6 @@ fn stub_trait_impl(
         where
             RequestSender: rpc_genie::send_request::SendRequest,
         {
-            type RequestSender = RequestSender;
-
             #(#trait_impl_methods)*
             #(#sub_service_getter_impls)*
         }
@@ -151,9 +150,7 @@ fn sub_service_getters(
                 let name = &sub_service.name;
                 let path = &sub_service.path;
                 quote! {
-                    fn #name(
-                        &self,
-                    ) -> &impl #path::#child_trait_name<RequestSender = Self::RequestSender>;
+                    fn #name(&self) -> &impl #path::#child_trait_name;
                 }
             })
         })
@@ -171,9 +168,7 @@ fn sub_service_getter_impls(
                 let name = &sub_service.name;
                 let path = &sub_service.path;
                 quote! {
-                    fn #name(
-                        &self,
-                    ) -> &impl #path::#child_trait_name<RequestSender = RequestSender> {
+                    fn #name(&self) -> &impl #path::#child_trait_name {
                         self.#name()
                     }
                 }
@@ -182,13 +177,11 @@ fn sub_service_getter_impls(
         .collect()
 }
 
-fn visible_args<'a>(
-    method: &'a RemoteMethod,
+pub(super) fn visible_args<'a>(
+    args: &'a [PatType],
     opposite_stub_alias: &str,
-) -> Vec<(syn::Ident, &'a Type)> {
-    method
-        .args
-        .iter()
+) -> Vec<(syn::Ident, Colon, &'a Type)> {
+    args.iter()
         .filter(|arg| {
             !matches!(
                 arg.ty.as_ref(),
@@ -202,7 +195,19 @@ fn visible_args<'a>(
                 // We have to rename pattern args as trait don't allow them
                 _ => format_ident!("__rpc_arg_{index}__"),
             };
-            (name, arg.ty.as_ref())
+            let colon_token = arg.colon_token;
+            (name, colon_token, arg.ty.as_ref())
         })
         .collect()
+}
+
+pub(super) fn send_single_request_output(output: &ReturnType) -> TokenStream {
+    match output {
+        ReturnType::Default => {
+            quote!(-> impl rpc_genie::SendSingleRequest<()>)
+        }
+        ReturnType::Type(arrow, output_type) => {
+            quote!(#arrow impl rpc_genie::SendSingleRequest<#output_type>)
+        }
+    }
 }
