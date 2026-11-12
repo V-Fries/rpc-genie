@@ -11,20 +11,20 @@ impl Service {
     pub(super) fn stub_traits(&self) -> TokenStream {
         let server_stub_trait = stub_trait(
             &self.server_remote_methods,
-            quote!(ServerStubTrait),
             quote!(ServerStub),
+            quote!(ServerStubImpl),
             "ClientStub",
             &self.sub_services,
-            quote!(ServerStubTrait),
+            quote!(ServerStub),
         );
 
         let client_stub_trait = stub_trait(
             &self.client_remote_methods,
-            quote!(ClientStubTrait),
             quote!(ClientStub),
+            quote!(ClientStubImpl),
             "ServerStub",
             &self.sub_services,
-            quote!(ClientStubTrait),
+            quote!(ClientStub),
         );
 
         quote! {

@@ -9,14 +9,14 @@ use crate::service::{RemoteMethod, Service, SubService, code_generation::utils::
 impl Service {
     pub fn stubs(&self) -> TokenStream {
         let client_stub = self.stub(
-            quote!(ClientStub),
+            quote!(ClientStubImpl),
             quote!(ClientStubArcHandle),
             quote!(ClientStubWeakHandle),
             &self.client_remote_methods,
             "ServerStub",
         );
         let server_stub = self.stub(
-            quote!(ServerStub),
+            quote!(ServerStubImpl),
             quote!(ServerStubArcHandle),
             quote!(ServerStubWeakHandle),
             &self.server_remote_methods,
