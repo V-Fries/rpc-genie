@@ -145,6 +145,8 @@ async fn server_tests(
     client_disconnected_receiver: tokio::sync::oneshot::Receiver<()>,
     server_doesnt_need_client_anymore_sender: tokio::sync::oneshot::Sender<()>,
 ) {
+    use rpc_genie::SendSingleRequest as _;
+
     // wait till client connects before running our tests
     tokio::time::timeout(std::time::Duration::from_secs(1), async {
         loop {
@@ -167,7 +169,9 @@ async fn server_tests(
     assert_eq!(
         vec![3],
         server_handle
-            .map_each_client(async |client| client.sub_service_2.add(1, 2).call().await.unwrap())
+            .map_each_client(async |client| {
+                client.sub_service_2().add(1, 2).call().await.unwrap()
+            })
             .await
     );
 
@@ -235,6 +239,8 @@ async fn client_tests(
     client_disconnected_sender: tokio::sync::oneshot::Sender<()>,
     server_doesnt_need_client_anymore_receiver: tokio::sync::oneshot::Receiver<()>,
 ) {
+    use rpc_genie::SendSingleRequest as _;
+
     // You can then call the server's remote method directly
     assert_eq!(
         "server",

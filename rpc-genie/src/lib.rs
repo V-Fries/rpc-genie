@@ -1,6 +1,7 @@
 #![doc = include_str!("../../README.md")]
 
 mod single_request_sender;
+pub use single_request_sender::SendSingleRequest;
 pub use single_request_sender::SingleRequestSender;
 
 #[doc(hidden)]
@@ -38,6 +39,8 @@ use std::sync::Arc;
 /// mod example {
 ///     #[rpc_genie::service]
 ///     mod service_a {
+///         use rpc_genie::SendSingleRequest as _;
+///
 ///         // Define other services to include in the current service
 ///         sub_services! {
 ///             // Can have any number of sub services
@@ -85,7 +88,7 @@ use std::sync::Arc;
 ///                 // The client can also get a stub to the server as an argument to a remote
 ///                 // method
 ///                 let _server_name = server.get_server_name().call().await.unwrap();
-///                 server.printer.print("bar".to_owned()).notify().await.unwrap();
+///                 server.printer().print("bar".to_owned()).notify().await.unwrap();
 ///             }
 ///         }
 ///     }
